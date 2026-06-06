@@ -14,286 +14,283 @@
 
 <p align="center">
   <h1 align="center">🤝 collab-cli</h1>
-  <p align="center"><strong>让多个 AI agent 像真实团队一样协作</strong></p>
-  <p align="center">一套通用协议 + CLI 工具，让 Claude Code、Reasonix、WorkBuddy、Cursor、Codex 等任何 AI agent 都能在同一个项目里分工合作、共享记忆、互相通信。</p>
+  <p align="center"><strong>Make multiple AI agents collaborate like a real team</strong></p>
+  <p align="center">A universal protocol + CLI tool that lets any AI agent — Claude Code, Reasonix, WorkBuddy, Cursor, Codex, and more — work together in the same project: sharing memory, assigning tasks, and communicating across sessions.</p>
 </p>
 
 <br/>
 
 ---
 
-## 🤔 你是否遇到过这些问题？
+## 🤔 Sound familiar?
 
-| 问题 | 场景 |
+| Problem | Scenario |
 |:--|:--|
-| 😵 **信息不同步** | Claude Code 改了代码，WorkBuddy 不知道，重复实现了一遍 |
-| 🔄 **重复对话** | 每次开新会话都要重新解释项目背景、架构、之前的决策 |
-| 🚫 **权限混乱** | 执行 agent 不小心改了不该改的配置文件 |
-| 📨 **沟通断层** | 给另一个 agent 发了审查请求，但对方根本没看到 |
-| 📝 **记忆膨胀** | 共享文档越来越长，每次启动都要读几百行，浪费 token |
+| 😵 **Out of sync** | Claude Code changed the code, WorkBuddy didn't know, implemented the same thing again |
+| 🔄 **Repeating yourself** | Every new session means re-explaining the project background, architecture, and past decisions |
+| 🚫 **Permission chaos** | An executor agent accidentally modified a config file it shouldn't have touched |
+| 📨 **Lost messages** | You sent a review request to another agent, but they never saw it |
+| 📝 **Memory bloat** | Shared docs keep growing, every startup reads hundreds of lines, wasting tokens |
 
-**collab-cli 解决了所有这些问题。**
+**collab-cli solves all of these.**
 
 <br/>
 
-## ✨ 核心特性一览
+## ✨ Feature overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                                                                 │
-│   🪪 工牌系统        给每个 agent 签发身份，L0-L4 五级权限       │
-│   🧠 三层记忆        活记忆(80行) + 片段(50行) + 归档(自动)     │
-│   📋 任务看板        创建→分配→执行→审查→完成，全生命周期       │
-│   📬 消息收件箱      P0-P3 优先级，关联任务，需回复标记          │
-│   🤝 握手协议        每次启动自动：读状态→领工牌→查消息→看任务   │
-│   💓 心跳监控        长驻 agent 的 inbox 自动巡检               │
-│   ⚡ 冲突仲裁        乐观锁 + 自动检测 + 总工裁定               │
-│   🔌 MCP 服务器      插件化集成，12 个结构化工具                 │
+│   🪪 Badge System       Issue identities to agents, L0-L4      │
+│   🧠 3-Layer Memory     Live (80 lines) + Fragments + Archive  │
+│   📋 Task Board         Create → Assign → Execute → Review     │
+│   📬 Inbox              P0-P3 priority, linked tasks, flags    │
+│   🤝 Handshake          Auto on startup: state + badge + msgs  │
+│   💓 Heartbeat          Persistent inbox monitoring             │
+│   ⚡ Conflict Resolution Optimistic lock + auto-detect + arb   │
+│   🔌 MCP Server         Plugin integration, 12 structured tools│
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 <br/>
 
-## 🚀 30 秒快速体验
+## 🚀 Quick start (30 seconds)
 
 ```bash
-# 第 1 步：安装
+# Step 1: Install
 npm i -g collab-cli
 
-# 第 2 步：在你的项目里初始化
+# Step 2: Initialize in your project
 cd my-awesome-project
-collab init --project "我的项目"
+collab init --project "My Project"
 
-# 第 3 步：给 agent 签发工牌
-collab badge issue claude-01 --role L4 --assigned-by user     # Claude = 总工
-collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = 贡献者
+# Step 3: Issue badges for agents
+collab badge issue claude-01 --role L4 --assigned-by user     # Claude = Chief Engineer
+collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = Contributor
 
-# 第 4 步：模拟协作
-collab task create "实现用户登录" --assignee claude-01 --priority P0
-collab inbox send --from claude-01 --to reasonix-01 --title "请审查登录模块" --priority P1 --needs-reply
-collab handshake claude-01   # Claude 进入时自动读取一切
+# Step 4: Try it out
+collab task create "Implement user login" --assignee claude-01 --priority P0
+collab inbox send --from claude-01 --to reasonix-01 --title "Review login module" --priority P1 --needs-reply
+collab handshake claude-01   # Claude reads everything automatically on entry
 ```
 
-运行 `collab status` 看全局：
+Run `collab status` to see the big picture:
 
 ```
-📋 协作体系状态 — 我的项目
+📋 Collaboration Status — My Project
 ──────────────────────────────────────────────────
 
-📝 SHARD (L0 活记忆): 13/80 行
+📝 SHARD (L0 Live Memory): 13/80 lines
 
-🪪 工牌 (2 个):
+🪪 Badges (2):
    claude-01: L4 (user)
    reasonix-01: L2 (user)
 
-📋 任务: 1 总计
+📋 Tasks: 1 total
    IN_PROGRESS: 0 | ASSIGNED: 1
 
-📬 Inbox: 1 条未读
-   reasonix-01: 1 未读 (P0:0 P1:1)
+📬 Inbox: 1 unread
+   reasonix-01: 1 unread (P0:0 P1:1)
 
-🧠 记忆: L1 0 个文件, L2 归档 0 个
+🧠 Memory: L1 0 files, L2 Archive 0
 ```
 
 <br/>
 
-## 🎯 这是给谁用的？
+## 🎯 Who is this for?
 
-| 你是... | 你能得到... |
+| You are... | You get... |
 |:--|:--|
-| 🧑‍💻 **同时用多个 AI 编程工具的开发者** | 所有 agent 共享同一份项目状态，不再重复对话 |
-| 🏗️ **搭建 AI 团队的架构师** | 标准化的角色权限、任务分发、审查流程 |
-| 🔬 **做 AI agent 研究的人** | 一套可复用的多 agent 协作协议参考实现 |
-| 🤖 **开发 AI agent 的人** | 通过 MCP 插件让你的 agent 即插即用地加入任何协作体系 |
+| 🧑‍💻 **A developer using multiple AI coding tools** | All agents share the same project state — no more repeating context |
+| 🏗️ **An architect building an AI team** | Standardized role permissions, task dispatch, review workflow |
+| 🔬 **An AI agent researcher** | A reusable multi-agent collaboration protocol reference implementation |
+| 🤖 **An AI agent developer** | Plug your agent into any project via MCP plugin |
 
 <br/>
 
-## 📖 一个完整的真实场景
+## 📖 A Complete Real-World Walkthrough
 
-> **场景**：你正在开发一个电商平台，用 Claude Code 写后端 API，用 Reasonix 做代码审查，用一个定时任务 agent 跑夜间批处理。
+> **Scenario**: You're building an e-commerce platform. Claude Code writes the backend API, Reasonix does code review, and a scheduler agent runs nightly batch jobs.
 
-### 第 1 步：初始化项目
+### Step 1: Initialize the project
 
 ```bash
-collab init --project "电商平台"
+collab init --project "E-Commerce Platform"
 ```
 
-这会在项目下创建 `.shared/` 目录，包含所有协作文件。
+This creates a `.shared/` directory with all collaboration files.
 
-### 第 2 步：签发工牌
+### Step 2: Issue badges
 
 ```bash
-# Claude 是总工（L4），拥有全部权限
+# Claude is Chief Engineer (L4) — full access
 collab badge issue claude-01 --role L4 --assigned-by user
 
-# WorkBuddy 是执行者（L1），只能写自己的任务
+# WorkBuddy is Executor (L1) — can only write own tasks
 collab badge issue workbuddy-01 --role L1 --assigned-by user
 
-# Reasonix 是审查者（L3），可以审批任务
+# Reasonix is Reviewer (L3) — can approve tasks
 collab badge issue reasonix-01 --role L3 --assigned-by user
 ```
 
-### 第 3 步：总工分配任务
+### Step 3: Chief Engineer assigns tasks
 
 ```bash
-# Claude（总工）给 WorkBuddy 分配任务
-collab task create "商品搜索优化" \
+# Claude (Chief Engineer) assigns a task to WorkBuddy
+collab task create "Product search optimization" \
   --assignee workbuddy-01 \
   --priority P1 \
   --deadline "2026-06-09T09:30:00+08:00" \
   --by claude-01
 
-# Claude 给自己分配任务
-collab task create "支付模块重构" \
+# Claude assigns a task to itself
+collab task create "Payment module refactor" \
   --assignee claude-01 \
   --priority P0 \
   --by user
 ```
 
-### 第 4 步：跨 agent 通信
+### Step 4: Cross-agent communication
 
 ```bash
-# WorkBuddy 完成任务后，发消息给 Claude 请求审查
+# WorkBuddy finishes the task and sends a review request to Claude
 collab inbox send \
   --from workbuddy-01 \
   --to claude-01 \
-  --title "搜索优化脚本已完成，请审查" \
+  --title "Search optimization done, please review" \
   --priority P1 \
   --type review_request \
-  --body "脚本位于 services/search.py，已通过本地测试" \
+  --body "Script at services/search.py, passed local tests" \
   --task T-001 \
   --needs-reply
 ```
 
-### 第 5 步：Claude 下次启动时自动感知
+### Step 5: Claude auto-detects on next startup
 
-Claude Code 打开项目时，握手协议自动执行：
+When Claude Code opens the project, the handshake protocol runs automatically:
 
 ```
-🤝 握手完成
-🪪 工牌: L4 总工 | 📬 未读: 1条(P1) | 📋 活跃任务: 2个
-⚠️ 有 1 条 P1 未读消息需优先处理: "搜索优化脚本已完成，请审查"
+🤝 Handshake complete
+🪪 Badge: L4 Chief Engineer | 📬 Unread: 1 (P1) | 📋 Active tasks: 2
+⚠️ 1 P1 unread message needs attention: "Search optimization done, please review"
 ```
 
-**不需要你手动告诉 Claude "WorkBuddy 给你发了消息"——它自己就知道。**
+**No need to manually tell Claude "WorkBuddy sent you a message" — it already knows.**
 
-### 第 6 步：审查通过
+### Step 6: Review and approve
 
 ```bash
-# Claude 审查后，更新任务状态
-collab task update T-001 REVIEW --by claude-01 --note "代码质量良好"
-collab task update T-001 DONE --by user --note "用户确认"
+# Claude reviews, then updates task status
+collab task update T-001 REVIEW --by claude-01 --note "Code quality looks good"
+collab task update T-001 DONE --by user --note "User confirmed"
 
-# 回复发件人
+# Reply to sender
 collab inbox send \
   --from claude-01 \
   --to workbuddy-01 \
-  --title "审查通过" \
+  --title "Review approved" \
   --type response \
-  --body "代码质量良好，已合并" \
+  --body "Code quality is good, merged" \
   --task T-001
 ```
 
 <br/>
 
-## 🏗️ 架构总览
+## 🏗️ Architecture
 
 ```
-你的项目/
-├── .shared/                        ← 协作体系根目录
-│   ├── MANIFEST.md                    系统声明 + 角色定义
-│   ├── SHARD.md                       L0 活记忆（每个 agent 必读，≤80行）
-│   ├── BADGE-claude-01.md             Claude 的工牌
-│   ├── BADGE-workbuddy-01.md          WorkBuddy 的工牌
+your-project/
+├── .shared/                        ← Collaboration root
+│   ├── MANIFEST.md                    System declaration + role definitions
+│   ├── SHARD.md                       L0 Live Memory (required reading, ≤80 lines)
+│   ├── BADGE-claude-01.md             Claude's badge
+│   ├── BADGE-workbuddy-01.md          WorkBuddy's badge
 │   ├── inbox/
-│   │   ├── claude-01/                 Claude 的收件箱
-│   │   │   └── 001-审查请求.md
-│   │   └── workbuddy-01/             WorkBuddy 的收件箱
+│   │   ├── claude-01/                 Claude's inbox
+│   │   │   └── 001-review-request.md
+│   │   └── workbuddy-01/             WorkBuddy's inbox
 │   ├── tasks/
-│   │   ├── T-001-搜索优化.md          任务文件（含状态机+进度日志）
-│   │   └── T-002-支付重构.md
-│   ├── memory/                        L1 记忆片段（按主题，≤50行/文件）
-│   │   ├── decisions.md               决策记录
-│   │   ├── lessons.md                 经验教训
-│   │   └── architecture.md            架构说明
-│   ├── archive/                       L2 归档（按日期，自动压缩）
-│   └── conflicts/                     冲突记录（等待仲裁）
+│   │   ├── T-001-search-optimize.md   Task file (state machine + progress log)
+│   │   └── T-002-payment-refactor.md
+│   ├── memory/                        L1 Memory fragments (by topic, ≤50 lines each)
+│   │   ├── decisions.md
+│   │   ├── lessons.md
+│   │   └── architecture.md
+│   ├── archive/                       L2 Archive (by date, auto-compressed)
+│   └── conflicts/                     Conflict records (awaiting arbitration)
 │
-├── .claude/CLAUDE.md                ← Claude Code 握手指令
-├── .reasonix/system.md              ← Reasonix 握手指令
-└── reasonix.toml                    ← Reasonix MCP 插件配置
+├── .claude/CLAUDE.md                ← Claude Code handshake instructions
+├── .reasonix/system.md              ← Reasonix handshake instructions
+└── reasonix.toml                    ← Reasonix MCP plugin config
 ```
 
 <br/>
 
-## 🪪 工牌权限详解
+## 🪪 Badge Permissions
 
 ```
-L4 总工 ──────┬── 全部读写 + 分发任务 + 升降级 + 管理工牌
-              │
-L3 审查者 ────┤── 审批任务 + 写 SHARD + 写记忆
-              │
-L2 贡献者 ────┤── 写记忆 + 提交审查申请
-              │
-L1 执行者 ────┤── 写自己的任务 + 写 inbox
-              │
-L0 观察者 ────┴── 只读（不能改任何文件）
+L4 Chief Engineer ──┬── Full read/write + assign tasks + manage badges
+                    │
+L3 Reviewer ────────┤── Approve tasks + write SHARD + write memory
+                    │
+L2 Contributor ─────┤── Write memory + submit reviews
+                    │
+L1 Executor ────────┤── Write own tasks + write inbox
+                    │
+L0 Observer ────────┴── Read-only (cannot modify any files)
 ```
 
-- 同一 agent 不同会话可以持有**不同工牌**
-- 没有总工时，第一个进入的 agent 自荐，用户确认
-- 工牌在会话结束时自动失效
+- Different sessions of the same agent can hold **different badges**
+- When no Chief Engineer exists, the first agent self-nominates, user confirms
+- Badges expire at session end
 
 <br/>
 
-## 🧠 记忆衰减机制
+## 🧠 Memory Decay Mechanism
 
 ```
-                 写入时
+                 Write time
                    │
                    ▼
            ┌──────────────┐
-           │   SHARD.md   │  ← L0: 只记录"此刻为真"的事实
-           │   (≤80 行)   │     每个 agent 必读
+           │   SHARD.md   │  ← L0: Only "currently true" facts (≤80 lines)
            └──────┬───────┘
                   │
-        超过 80 行 或 任务完成时
+        Exceeds 80 lines or task completed
                   │
                   ▼
            ┌──────────────┐
-           │   memory/    │  ← L1: 按主题拆分
-           │  (≤50行/文件)│     decisions / lessons / architecture
+           │   memory/    │  ← L1: By topic (≤50 lines/file)
            └──────┬───────┘
                   │
-          每周 或 L1 超限时
+          Weekly or L1 exceeds limit
                   │
                   ▼
            ┌──────────────┐
-           │   archive/   │  ← L2: 按日期压缩
-           │  (≤50行/天)  │     只在需要追溯时查阅
+           │   archive/   │  ← L2: Compressed by date (≤50 lines/day)
            └──────────────┘
 ```
 
-**效果**：新 agent 进入时只需读 80 行就了解全貌，而不是 800 行。
+**Result**: New agents only need to read 80 lines to understand the full picture.
 
 <br/>
 
-## 🔌 Agent 接入指南
+## 🔌 Agent Integration Guide
 
-### Claude Code（一行命令）
+### Claude Code (one line)
 
 ```bash
 cat node_modules/collab-cli/src/templates/CLAUDE_PROTOCOL.md >> .claude/CLAUDE.md
 ```
 
-Claude Code 每次启动自动执行握手，读 SHARD → 领工牌 → 查 inbox → 看任务。
+Claude Code will automatically handshake on each startup: read SHARD → get badge → check inbox → review tasks.
 
-### Reasonix（三种方式）
+### Reasonix (three options)
 
-**方式 A：MCP 插件（推荐，最强集成）**
+**Option A: MCP Plugin (recommended, strongest integration)**
 
-在 `reasonix.toml` 中加：
+Add to `reasonix.toml`:
 
 ```toml
 [[plugins]]
@@ -303,18 +300,18 @@ command = "collab"
 args = ["mcp"]
 ```
 
-Reasonix 自动获得 12 个工具（`mcp__collab__inbox_check`、`mcp__collab__task_create` 等），原生调用。
+Reasonix gains 12 tools natively (`mcp__collab__inbox_check`, `mcp__collab__task_create`, etc.).
 
-**方式 B：自定义命令**
+**Option B: Custom Command**
 
 ```bash
 mkdir -p .reasonix/commands
 cp node_modules/collab-cli/src/templates/reasonix-commands/collab.md .reasonix/commands/
 ```
 
-输入 `/collab handshake` 触发握手。
+Type `/collab handshake` to trigger handshake.
 
-**方式 C：协议注入**
+**Option C: Protocol Injection**
 
 ```bash
 mkdir -p .reasonix
@@ -336,171 +333,170 @@ cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
 
 <br/>
 
-## 📬 消息系统
+## 📬 Messaging System
 
-### 发送消息
+### Send a message
 
 ```bash
 collab inbox send \
   --from claude-01 \
   --to workbuddy-01 \
-  --title "紧急：修复支付超时" \
+  --title "URGENT: Fix payment timeout" \
   --priority P0 \
   --type task \
-  --body "支付接口超时未返回结果，订单卡在待支付状态" \
+  --body "Payment API not responding, orders stuck in pending state" \
   --task T-003 \
   --needs-reply
 ```
 
-### 检查未读
+### Check unread
 
 ```bash
 $ collab inbox check workbuddy-01
 
-📬 未读消息:
+📬 Unread Messages:
 
-| ID     | 优先级 | 类型 | 来自      | 标题                  | 需回复 |
-|--------|--------|------|-----------|----------------------|:------:|
-| MSG-001| P0     | task | claude-01 | 紧急：修复支付超时    |   ✅   |
+| ID     | Priority | Type | From      | Title                  | Needs Reply |
+|--------|----------|------|-----------|------------------------|:-----------:|
+| MSG-001| P0       | task | claude-01 | URGENT: Fix payment    |     ✅      |
 ```
 
-### 消息类型
+### Message types
 
-| 类型 | 用途 |
+| Type | Use case |
 |:--|:--|
-| `task` | 分配任务 |
-| `review_request` | 请求审查 |
-| `approval` | 审批通过/拒绝 |
-| `question` | 提问 |
-| `notification` | 通知 |
-| `response` | 回复 |
+| `task` | Assign a task |
+| `review_request` | Request code review |
+| `approval` | Approve or reject |
+| `question` | Ask a question |
+| `notification` | General notification |
+| `response` | Reply to a message |
 
 <br/>
 
-## 💓 心跳监控
+## 💓 Heartbeat Monitoring
 
-为长时间运行的 agent 提供 inbox 巡检：
+Persistent inbox monitoring for long-running agents:
 
 ```bash
-# 长驻模式 — 每 5 分钟检查一次
+# Persistent mode — check every 5 minutes
 collab heartbeat workbuddy-01
 
-# 单次检查 — 适合脚本和 CI
+# Single check — for scripts and CI
 collab heartbeat claude-01 --once
-# exit 0 = 无消息
-# exit 2 = 有高优先级消息（P0/P1）
+# exit 0 = no messages
+# exit 2 = high priority messages (P0/P1)
 
-# 自定义间隔
-collab heartbeat claude-01 --interval 60  # 每分钟
+# Custom interval
+collab heartbeat claude-01 --interval 60  # every minute
 ```
 
-通知输出格式（机器可解析）：
+Notification output (machine-parseable):
 
 ```
 [COLLAB_HEARTBEAT] {"type":"new_message","agentId":"claude-01","message":{"id":"MSG-001","priority":"P0",...}}
-🚨 新消息: [P0] workbuddy-01 → 紧急：修复支付超时 (需回复)
+🚨 New message: [P0] workbuddy-01 → URGENT: Fix payment timeout (needs reply)
 ```
 
 <br/>
 
-## ⚡ 冲突仲裁
+## ⚡ Conflict Resolution
 
-当两个 agent 同时修改同一个文件时：
+When two agents try to modify the same file simultaneously:
 
 ```
-第 1 层：预防
-├─ 任务 assignee 明确 → 别人不碰
-├─ SHARD.md 写入前检查 last_updated_by
-└─ scope 限定每个 agent 的工作目录
+Layer 1: Prevention
+├─ Task assignee is explicit → others don't touch it
+├─ SHARD.md checks last_updated_by before writing
+└─ Scope limits each agent's working directories
 
-第 2 层：检测
-├─ frontmatter 的 updated_at + updated_by
-└─ 写入时乐观锁自动比对版本
+Layer 2: Detection
+├─ Frontmatter last_updated_by + last_updated_at
+└─ Optimistic lock compares version on write
 
-第 3 层：仲裁
-├─ 冲突写入 conflicts/C-{timestamp}.md
-├─ 总工 24h 内裁定
-└─ 总工无法裁定 → 上报用户
+Layer 3: Arbitration
+├─ Conflict written to conflicts/C-{timestamp}.md
+├─ Chief Engineer resolves within 24h
+└─ If Chief Engineer can't decide → escalate to user
 ```
 
 <br/>
 
-## 🆚 和其他方案的对比
+## 🆚 How does it compare?
 
-| 特性 | 手动协调 | Git 分支 | **collab-cli** |
+| Feature | Manual coordination | Git branches | **collab-cli** |
 |:--|:--:|:--:|:--:|
-| 实时消息传递 | ❌ | ❌ | ✅ |
-| 角色权限控制 | ❌ | 分支级 | 文件级 |
-| 共享记忆 | 口头描述 | commit message | 结构化三层记忆 |
-| 任务生命周期 | 口头分配 | PR/Issue | 内置状态机 |
-| 新 agent 加入成本 | 重新解释一切 | clone 仓库 | 握手协议自动对齐 |
-| 跨 agent 类型 | 需要适配 | 通用 | 通用（纯文件协议） |
-| Token 消耗 | 每次重读全部 | N/A | ≤80 行活记忆 |
+| Real-time messaging | ❌ | ❌ | ✅ |
+| Role-based permissions | ❌ | Branch-level | File-level |
+| Shared memory | Verbal | Commit messages | Structured 3-layer |
+| Task lifecycle | Verbal | PR/Issue | Built-in state machine |
+| New agent onboarding | Re-explain everything | Clone repo | Handshake auto-aligns |
+| Token cost | Re-read everything | N/A | ≤80 lines live memory |
 
 <br/>
 
-## 🛠️ 开发
+## 🛠️ Development
 
 ```bash
-# 克隆仓库
+# Clone the repo
 git clone https://github.com/yinsang0910-star/collab-cli.git
 cd collab-cli
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 运行测试（64 个，全部通过）
+# Run tests (73 passing — unit + stress)
 npm test
 
-# 本地开发链接
+# Local development link
 npm link
 ```
 
-### 项目结构
+### Project structure
 
 ```
 collab-cli/
-├── bin/collab.js              CLI 入口（19 个子命令）
+├── bin/collab.js              CLI entry (19 subcommands)
 ├── src/
-│   ├── commands/              命令实现
-│   │   ├── init.js            初始化 + 迁移
-│   │   ├── status.js          全局状态
-│   │   ├── badge.js           工牌管理
-│   │   ├── task.js            任务生命周期
-│   │   ├── inbox.js           消息收发
-│   │   ├── memory.js          记忆衰减
-│   │   ├── conflict.js        冲突仲裁
-│   │   ├── heartbeat.js       心跳监控
-│   │   └── mcp-server.js      MCP 服务器
-│   ├── core/                  核心模块
-│   │   ├── protocol.js        握手协议 + 权限
-│   │   ├── shard.js           SHARD 管理
-│   │   ├── fs-lock.js         乐观锁
-│   │   └── yaml.js            Frontmatter 引擎
-│   ├── templates/             协议模板
+│   ├── commands/              Command implementations
+│   │   ├── init.js            Initialization + migration
+│   │   ├── status.js          Global status
+│   │   ├── badge.js           Badge management
+│   │   ├── task.js            Task lifecycle
+│   │   ├── inbox.js           Messaging
+│   │   ├── memory.js          Memory decay
+│   │   ├── conflict.js        Conflict resolution
+│   │   ├── heartbeat.js       Heartbeat monitoring
+│   │   └── mcp-server.js      MCP server
+│   ├── core/                  Core modules
+│   │   ├── protocol.js        Handshake protocol + permissions
+│   │   ├── shard.js           SHARD management
+│   │   ├── fs-lock.js         Optimistic locking
+│   │   └── yaml.js            Frontmatter engine
+│   ├── templates/             Protocol templates
 │   │   ├── CLAUDE_PROTOCOL.md
 │   │   ├── REASONIX_PROTOCOL.md
 │   │   ├── CURSOR_PROTOCOL.md
 │   │   ├── CODEX_PROTOCOL.md
 │   │   └── AGENT_PROTOCOL.md
-│   └── utils/                 工具函数
-├── package.json               collab-cli@1.0.5
-├── README.md                  英文
-├── README.zh-CN.md            中文
-├── README.ja.md               日文
-└── README.ko.md               韩文
+│   └── utils/                 Utilities
+├── package.json               collab-cli@1.0.7
+├── README.md                  English
+├── README.zh-CN.md            Chinese
+├── README.ja.md               Japanese
+└── README.ko.md               Korean
 ```
 
 <br/>
 
 ## 📄 License
 
-MIT — 随便用，商用也行。
+MIT — use it however you want, including commercial use.
 
 <br/>
 
 ---
 
 <p align="center">
-  如果这个项目对你有帮助，给个 ⭐ 吧！
+  If this project helped you, give it a ⭐!
 </p>
