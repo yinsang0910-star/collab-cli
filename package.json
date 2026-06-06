@@ -1,8 +1,17 @@
 {
   "name": "collab-cli",
   "version": "1.0.4",
-  "description": "Multi-agent collaboration protocol CLI — 多智能体协作任务体系",
+  "description": "Universal collaboration protocol + CLI for multi-agent LLM teams",
   "type": "module",
+  "homepage": "https://github.com/yinsang0910-star/collab-cli",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yinsang0910-star/collab-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yinsang0910-star/collab-cli/issues"
+  },
+  "keywords": ["collaboration", "multi-agent", "llm", "protocol", "mcp", "claude", "reasonix"],
   "bin": {
     "collab": "bin/collab.js"
   },
