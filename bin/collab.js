@@ -38,6 +38,8 @@ import * as conflictCmd from '../src/commands/conflict.js';
 import * as heartbeatCmd from '../src/commands/heartbeat.js';
 import * as nodeCmd from '../src/commands/node.js';
 import * as setupCmd from '../src/commands/setup.js';
+import * as dashboardCmd from '../src/commands/dashboard.js';
+import * as gitSyncCmd from '../src/commands/git-sync.js';
 import { handshake } from '../src/core/protocol.js';
 
 // ── 参数解析 ──
@@ -108,6 +110,12 @@ try {
       break;
     case 'mcp':
       cmdMcp();
+      break;
+    case 'dashboard':
+      cmdDashboard();
+      break;
+    case 'git':
+      cmdGit();
       break;
     case 'node':
       await cmdNode();
@@ -583,6 +591,44 @@ function cmdMcp() {
   import(mcpPath);
 }
 
+function cmdDashboard() {
+  const sharedDir = getSharedDir();
+  const port = getFlag('port', '8080');
+  dashboardCmd.startDashboard(sharedDir, port);
+}
+
+function cmdGit() {
+  const sharedDir = getSharedDir();
+  const gitSubcommand = subcommand;
+
+  switch (gitSubcommand) {
+    case 'init': {
+      const result = gitSyncCmd.gitInit(sharedDir);
+      console.log(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
+      break;
+    }
+    case 'sync': {
+      const agentId = getFlag('agent', 'system');
+      const push = hasFlag('push');
+      const pull = hasFlag('pull');
+      const result = gitSyncCmd.gitSync(sharedDir, { agentId, push, pull });
+      console.log(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
+      break;
+    }
+    case 'status': {
+      const status = gitSyncCmd.gitStatus(sharedDir);
+      console.log(gitSyncCmd.formatGitStatus(status));
+      break;
+    }
+    default:
+      console.error('用法: collab git <init|sync|status>');
+      console.error('  collab git init                  初始化 .shared/ 的 git 管理');
+      console.error('  collab git sync [--push] [--pull] 自动 commit + push + pull');
+      console.error('  collab git status                显示未同步的变更');
+      process.exit(1);
+  }
+}
+
 async function cmdNode() {
   const sharedDir = getSharedDir();
   const nodeSubcommand = subcommand;
@@ -665,6 +711,13 @@ collab — 多智能体协作任务体系 CLI
   heartbeat <agent-id> --once    单次检查（不长驻）
 
   mcp                            启动 MCP server（stdio JSON-RPC）
+
+  dashboard                      启动 Web 控制面板（默认 :8080）
+  dashboard --port 8080          自定义端口
+
+  git init                       初始化 .shared/ 的 git 管理
+  git sync [--push] [--pull]     自动 commit + push + pull
+  git status                     显示未同步的变更
 
   node start                     启动 LAN 节点（跨设备协作）
   node pull --host <ip>          从远程节点拉取 SHARD + tasks

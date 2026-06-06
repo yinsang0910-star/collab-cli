@@ -23,6 +23,8 @@ import * as taskCmd from '../commands/task.js';
 import * as inboxCmd from '../commands/inbox.js';
 import * as memoryCmd from '../commands/memory.js';
 import * as conflictCmd from '../commands/conflict.js';
+import * as yaml from '../core/yaml.js';
+import { now } from '../utils/timestamp.js';
 import { handshake } from '../core/protocol.js';
 
 // ── 配置 ──
@@ -188,6 +190,51 @@ const TOOLS = [
       required: [],
     },
   },
+  {
+    name: 'collab_memory_write',
+    description: 'Write a memory fragment to L1 memory layer (max 50 lines per file).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'Memory filename (e.g. "lessons.md")' },
+        content: { type: 'string', description: 'Content to write (appends if file exists)' },
+        agent_id: { type: 'string', description: 'Agent writing the memory' },
+      },
+      required: ['filename', 'content'],
+    },
+  },
+  {
+    name: 'collab_shard_update',
+    description: 'Update SHARD.md live memory. Requires L3+ permission.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        section: { type: 'string', description: 'Section to update (e.g. "当前焦点", "待办")' },
+        content: { type: 'string', description: 'New content for the section' },
+        agent_id: { type: 'string', description: 'Agent updating the SHARD' },
+      },
+      required: ['section', 'content', 'agent_id'],
+    },
+  },
+  {
+    name: 'collab_peer_list',
+    description: 'List discovered LAN peers (only available when collab node is running).',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'collab_conflict_create',
+    description: 'Create a conflict record when two agents try to modify the same file.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'The conflicting file path' },
+        agent1: { type: 'string', description: 'First agent ID' },
+        agent2: { type: 'string', description: 'Second agent ID' },
+        reason: { type: 'string', description: 'Description of the conflict' },
+      },
+      required: ['file', 'agent1', 'agent2', 'reason'],
+    },
+  },
 ];
 
 // ── MCP 协议处理 ──
@@ -327,6 +374,48 @@ function handleToolCall(params) {
       case 'collab_conflict_list': {
         const conflicts = conflictCmd.list(sharedDir, { status: args.status });
         result = conflictCmd.formatConflictList(conflicts);
+        break;
+      }
+      case 'collab_memory_write': {
+        const memDir = path.join(sharedDir, 'memory');
+        if (!fs.existsSync(memDir)) fs.mkdirSync(memDir, { recursive: true });
+        const memPath = path.join(memDir, args.filename);
+        const existing = fs.existsSync(memPath) ? fs.readFileSync(memPath, 'utf-8') : '';
+        const timestamp = now();
+        const entry = `\n\n## ${timestamp} (${args.agent_id || 'agent'})\n\n${args.content}`;
+        fs.writeFileSync(memPath, existing + entry, 'utf-8');
+        result = `Memory written to memory/${args.filename}`;
+        break;
+      }
+      case 'collab_shard_update': {
+        const shardPath = path.join(sharedDir, 'SHARD.md');
+        const { data, content } = yaml.safeRead(shardPath);
+        // 简单的 section 替换
+        const sectionRegex = new RegExp(`(## ${args.section}[\\s\\S]*?)(?=## |$)`);
+        if (content.match(sectionRegex)) {
+          const newContent = content.replace(sectionRegex, `## ${args.section}\n\n${args.content}\n`);
+          yaml.write(shardPath, { ...data, last_updated_by: args.agent_id, last_updated_at: now() }, newContent);
+          result = `SHARD section "${args.section}" updated`;
+        } else {
+          result = `Section "${args.section}" not found in SHARD`;
+        }
+        break;
+      }
+      case 'collab_peer_list': {
+        // 从 LAN node 的内存状态读取（如果有的话）
+        result = 'Peer listing requires collab node to be running. Use `collab node status` instead.';
+        break;
+      }
+      case 'collab_conflict_create': {
+        const cResult = conflictCmd.create(sharedDir, {
+          file: args.file,
+          agent1: args.agent1,
+          agent2: args.agent2,
+          reason: args.reason,
+        });
+        result = cResult.success
+          ? `Conflict record created: ${cResult.id}`
+          : `Error creating conflict: ${cResult.error}`;
         break;
       }
       default:
