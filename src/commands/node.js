@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { Discovery, generateNodeId, getLocalIP } from '../node/discovery.js';
 import { CollabServer } from '../node/server.js';
 import { Router } from '../node/router.js';
+import { SyncManager, pullFromPeer } from '../node/sync.js';
 
 let currentNode = null; // 全局节点实例
 
@@ -62,7 +63,24 @@ export async function startNode(sharedDir, { agents, port, token }) {
   // 创建路由器
   const router = new Router({ sharedDir, discovery, token: authToken });
 
-  currentNode = { nodeId, server, discovery, router, agentList, authToken, localIP, apiPort };
+  // 启动同步管理器
+  const sync = new SyncManager({
+    sharedDir,
+    discovery,
+    token: authToken,
+    onSync: (results) => {
+      for (const r of results) {
+        if (r.type === 'shard') {
+          console.log(`   🔄 SHARD v${r.version} 已推送到 ${r.pushed} 个节点`);
+        } else if (r.type === 'tasks') {
+          console.log(`   🔄 ${r.count} 个任务已推送到 ${r.pushed} 个节点`);
+        }
+      }
+    },
+  });
+  sync.start();
+
+  currentNode = { nodeId, server, discovery, router, sync, agentList, authToken, localIP, apiPort };
 
   console.log('');
   console.log(`   节点 ID: ${nodeId}`);
@@ -77,6 +95,7 @@ export async function startNode(sharedDir, { agents, port, token }) {
   // 优雅退出
   process.on('SIGINT', async () => {
     console.log('\n   正在停止节点...');
+    sync.stop();
     discovery.stop();
     await server.stop();
     console.log('   节点已停止');

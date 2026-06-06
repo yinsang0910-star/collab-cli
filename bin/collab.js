@@ -595,6 +595,24 @@ async function cmdNode() {
       await nodeCmd.startNode(sharedDir, { agents, port, token });
       break;
     }
+    case 'pull': {
+      const host = getFlag('host', '127.0.0.1');
+      const port = parseInt(getFlag('port', '9527'));
+      const token = getFlag('token', '');
+      const { pullFromPeer } = await import('../src/node/sync.js');
+      console.log(`📥 从 ${host}:${port} 拉取数据...`);
+      const result = await pullFromPeer(host, port, sharedDir, token);
+      if (result.shard) {
+        console.log(`   ✅ SHARD v${result.shard.version} 已同步`);
+      }
+      if (result.tasks) {
+        console.log(`   ✅ ${result.tasks.count} 个任务已同步`);
+      }
+      if (!result.shard && !result.tasks) {
+        console.log(`   ⚠️ 未获取到数据，请检查目标节点是否在线`);
+      }
+      break;
+    }
     case 'status': {
       const status = nodeCmd.nodeStatus();
       console.log(nodeCmd.formatNodeStatus(status));
@@ -649,6 +667,7 @@ collab — 多智能体协作任务体系 CLI
   mcp                            启动 MCP server（stdio JSON-RPC）
 
   node start                     启动 LAN 节点（跨设备协作）
+  node pull --host <ip>          从远程节点拉取 SHARD + tasks
   node status                    查看节点状态
 
 选项:

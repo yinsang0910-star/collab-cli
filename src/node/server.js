@@ -6,6 +6,8 @@
  */
 
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as inboxCmd from '../commands/inbox.js';
 import * as taskCmd from '../commands/task.js';
 import * as statusCmd from '../commands/status.js';
@@ -148,6 +150,32 @@ export class CollabServer {
         return;
       }
 
+      // POST /api/sync/shard — 接收远程 SHARD 推送
+      if (req.method === 'POST' && path === '/api/sync/shard') {
+        const body = await this._readBody(req);
+        this._handleSyncShard(req, res, body);
+        return;
+      }
+
+      // POST /api/sync/tasks — 接收远程 tasks 推送
+      if (req.method === 'POST' && path === '/api/sync/tasks') {
+        const body = await this._readBody(req);
+        this._handleSyncTasks(req, res, body);
+        return;
+      }
+
+      // GET /api/sync/shard — 获取当前 SHARD 版本信息
+      if (req.method === 'GET' && path === '/api/sync/shard') {
+        this._handleSyncShardGet(req, res);
+        return;
+      }
+
+      // GET /api/sync/tasks — 获取当前 tasks 列表
+      if (req.method === 'GET' && path === '/api/sync/tasks') {
+        this._handleSyncTasksGet(req, res);
+        return;
+      }
+
       // 404
       this._json(res, 404, { error: `Not found: ${path}` });
 
@@ -235,6 +263,112 @@ export class CollabServer {
   _handleTasks(req, res) {
     const tasks = taskCmd.list(this.sharedDir);
     this._json(res, 200, { tasks, count: tasks.length });
+  }
+
+  _handleSyncShard(req, res, body) {
+    // 接收远程 SHARD 推送，带版本检查
+    const shardPath = path.join(this.sharedDir, 'SHARD.md');
+    const current = yaml.safeRead(shardPath);
+
+    const remoteVersion = body.data?.version || 0;
+    const localVersion = current.data?.version || 0;
+
+    // 远程版本更新 → 接受
+    if (remoteVersion > localVersion) {
+      yaml.write(shardPath, body.data, body.content);
+      this._json(res, 200, {
+        accepted: true,
+        message: `SHARD updated: v${localVersion} → v${remoteVersion}`,
+        version: remoteVersion,
+      });
+      return;
+    }
+
+    // 版本相同 → 冲突（最近修改者优先）
+    if (remoteVersion === localVersion) {
+      const remoteTime = body.data?.last_updated_at || '';
+      const localTime = current.data?.last_updated_at || '';
+      if (remoteTime > localTime) {
+        yaml.write(shardPath, body.data, body.content);
+        this._json(res, 200, { accepted: true, message: 'SHARD updated (same version, newer timestamp)' });
+        return;
+      }
+    }
+
+    // 本地版本更新 → 拒绝
+    this._json(res, 200, {
+      accepted: false,
+      message: `Local version is newer (v${localVersion} vs v${remoteVersion})`,
+    });
+  }
+
+  _handleSyncShardGet(req, res) {
+    const shardPath = path.join(this.sharedDir, 'SHARD.md');
+    const { data, content } = yaml.safeRead(shardPath);
+    this._json(res, 200, { data, content, version: data?.version || 0 });
+  }
+
+  _handleSyncTasks(req, res, body) {
+    // 接收远程 tasks 推送（整个任务列表）
+    if (!body.tasks || !Array.isArray(body.tasks)) {
+      this._json(res, 400, { error: 'Missing tasks array' });
+      return;
+    }
+
+    const tasksDir = path.join(this.sharedDir, 'tasks');
+    if (!fs.existsSync(tasksDir)) {
+      fs.mkdirSync(tasksDir, { recursive: true });
+    }
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const task of body.tasks) {
+      if (!task.id) continue;
+
+      // 查找本地是否已有此任务
+      const localFiles = fs.readdirSync(tasksDir).filter(f => f.startsWith(task.id));
+      const localPath = localFiles.length > 0
+        ? path.join(tasksDir, localFiles[0])
+        : path.join(tasksDir, `${task.id}-${(task.title || 'task').replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 40)}.md`);
+
+      if (localFiles.length > 0) {
+        // 已有 → 检查版本
+        const local = yaml.safeRead(localPath);
+        const localStatus = local.data?.status || 'DRAFT';
+        const remoteStatus = task.status || 'DRAFT';
+
+        // 状态机：远程状态更"前进" → 接受
+        const statusOrder = { DRAFT: 0, ASSIGNED: 1, IN_PROGRESS: 2, REVIEW: 3, DONE: 4, BLOCKED: -1 };
+        if ((statusOrder[remoteStatus] || 0) > (statusOrder[localStatus] || 0)) {
+          yaml.updateData(localPath, { status: remoteStatus, assignee: task.assignee });
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        // 新任务 → 创建
+        const data = {
+          id: task.id,
+          title: task.title || 'Untitled',
+          status: task.status || 'DRAFT',
+          priority: task.priority || 'P2',
+          assignee: task.assignee,
+          reviewer: task.reviewer || 'user',
+          created_by: task.created_by || 'remote',
+          created_at: task.created_at || now(),
+        };
+        yaml.write(localPath, data, `# ${task.id}: ${task.title}\n\nSynced from remote node.`);
+        updated++;
+      }
+    }
+
+    this._json(res, 200, { updated, skipped, total: body.tasks.length });
+  }
+
+  _handleSyncTasksGet(req, res) {
+    const tasks = taskCmd.list(this.sharedDir);
+    this._json(res, 200, { tasks });
   }
 
   _readBody(req) {
