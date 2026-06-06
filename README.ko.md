@@ -2,178 +2,232 @@
   <a href="./README.md">English</a> | <a href="./README.zh-CN.md">中文</a> | <a href="./README.ja.md">日本語</a> | <strong>한국어</strong>
 </p>
 
-# collab-cli
+<p align="center">
+  <img src="https://img.shields.io/npm/v/collab-cli?color=cb3837&labelColor=161b22&logo=npm" alt="npm"/>
+  <img src="https://img.shields.io/npm/dm/collab-cli?color=3fb950&labelColor=161b22" alt="downloads"/>
+  <img src="https://img.shields.io/github/stars/yinsang0910-star/collab-cli?color=dbab09&labelColor=161b22&logo=github" alt="stars"/>
+  <img src="https://img.shields.io/npm/l/collab-cli?color=8b949e&labelColor=161b22" alt="license"/>
+  <img src="https://img.shields.io/badge/tests-64%20passing-brightgreen?labelColor=161b22" alt="tests"/>
+</p>
 
-멀티 에이전트 LLM 팀을 위한 유니버설 협업 프로토콜 + CLI 도구. Claude Code, Reasonix, Codex, WorkBuddy, Cursor 등 어떤 에이전트든 프로젝트에 참여하여 공유 프로토콜 아래에서 협업할 수 있습니다.
+<br/>
 
-## 지원 에이전트
+<p align="center">
+  <h1 align="center">🤝 collab-cli</h1>
+  <p align="center"><strong>여러 AI 에이전트를 실제 팀처럼 협업시키세요</strong></p>
+  <p align="center">Claude Code, Reasonix, WorkBuddy, Cursor, Codex 등 어떤 AI 에이전트든 하나의 프로젝트에서 역할 분담, 기억 공유, 상호 통신이 가능한 유니버설 프로토콜 + CLI 도구.</p>
+</p>
 
-| 에이전트 | 통합 방식 | 프로토콜 템플릿 |
-|----------|-----------|----------------|
-| **Claude Code** | `.claude/CLAUDE.md` | `CLAUDE_PROTOCOL.md` |
-| **Reasonix** | `.reasonix/system.md` + MCP 플러그인 | `REASONIX_PROTOCOL.md` |
-| **WorkBuddy** | `.workbuddy/MEMORY.md` | `AGENT_PROTOCOL.md` |
-| **Cursor** | `.cursor/rules` | `CURSOR_PROTOCOL.md` |
-| **Codex** | `AGENTS.md` | `CODEX_PROTOCOL.md` |
-| **모든 에이전트** | 루트 `COLLAB_PROTOCOL.md` | `AGENT_PROTOCOL.md` |
+<br/>
 
-## 빠른 시작
+---
+
+## 🤔 이런 적 있으신가요?
+
+| 문제 | 상황 |
+|:--|:--|
+| 😵 **정보 비동기** | Claude Code가 코드를 바꿨는데 WorkBuddy가 몰라서 같은 걸 또 구현 |
+| 🔄 **반복 설명** | 새 세션마다 프로젝트 배경, 아키텍처, 과거 결정을 다시 설명 |
+| 🚫 **권한 혼란** | 실행 에이전트가 수정하면 안 되는 설정 파일을 실수로 변경 |
+| 📨 **소통 단절** | 다른 에이전트에게 검토 요청을 보냈는데 상대가 전혀 모름 |
+| 📝 **기록 비대화** | 공유 문서가 점점 길어져서 매번 수백 줄을 읽으며 토큰 낭비 |
+
+**collab-cli는 이 모든 문제를 해결합니다.**
+
+<br/>
+
+## ✨ 핵심 기능一览
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   🪪 배지 시스템      각 에이전트에게 신분 발급, L0-L4 5단계    │
+│   🧠 3계층 기억       활성(80줄) + 조각(50줄) + 아카이브(자동)  │
+│   📋 작업 보드        생성→배정→실행→검토→완료, 전체 생명주기   │
+│   📬 메일함           P0-P3 우선순위, 작업 연동, 응답 필요 플래그│
+│   🤝 핸드셰이크       시작 시 자동: 상태 읽기→배지 수령→확인     │
+│   💓 하트비트         상주 에이전트의 inbox 자동 순회             │
+│   ⚡ 충돌 중재        낙관적 잠금 + 자동 감지 + 총공 재정         │
+│   🔌 MCP 서버        플러그인 통합, 12개 구조화 도구              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+<br/>
+
+## 🚀 30초 만에 체험하기
 
 ```bash
-# 설치
+# 1단계: 설치
 npm i -g collab-cli
 
-# 프로젝트에서 초기화
-cd /path/to/your/project
+# 2단계: 프로젝트에서 초기화
+cd my-awesome-project
 collab init --project "내 프로젝트"
 
-# 에이전트에게 배지 발급
-collab badge issue claude-01 --role L4 --assigned-by user
-collab badge issue reasonix-01 --role L2 --assigned-by user
+# 3단계: 에이전트에게 배지 발급
+collab badge issue claude-01 --role L4 --assigned-by user     # Claude = 총공
+collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = 기여자
 
-# 에이전트 핸드셰이크 (세션마다 1회)
-collab handshake claude-01
+# 4단계: 협업 시뮬레이션
+collab task create "사용자 로그인 구현" --assignee claude-01 --priority P0
+collab inbox send --from claude-01 --to reasonix-01 --title "로그인 모듈 검토 요청" --priority P1 --needs-reply
+collab handshake claude-01   # Claude가 참여 시 자동으로 모든 정보를 읽음
 ```
 
-## 핵심 개념
-
-### 배지 시스템
-
-각 에이전트는 프로젝트 참여 시 배지를 받고, 역할과 권한이 정의됩니다. 같은 에이전트의 다른 세션이 다른 배지를 가질 수 있습니다.
-
-| 레벨 | 이름 | 권한 |
-|------|------|------|
-| L0 | 관찰자 | 읽기 전용 |
-| L1 | 실행자 | 전체 읽기 + 자기 작업 쓰기 + inbox 쓰기 |
-| L2 | 기여자 | L1 + 메모리 쓰기 + 리뷰 제출 |
-| L3 | 리뷰어 | L2 + 작업 승인 + SHARD 쓰기 |
-| 4 | 총공 (총괄 엔지니어) | 전체 권한 + 작업 배정 + 배지 관리 |
-
-### 기억 계층
+`collab status`로 전체 현황 확인:
 
 ```
-L0  SHARD.md     ← 활성 기억 (≤80줄) — 현재 상태, 필수 읽기
-L1  memory/      ← 구조화된 조각 (각 ≤50줄) — 주제별
-L2  archive/     ← 날짜별 압축 기록 — 필요할 때만 참조
+📋 협업 시스템 상태 — 내 프로젝트
+──────────────────────────────────────────────────
+
+📝 SHARD (L0 활성 기억): 13/80줄
+
+🪪 배지 (2개):
+   claude-01: L4 (user)
+   reasonix-01: L2 (user)
+
+📋 작업: 1건
+   IN_PROGRESS: 0 | ASSIGNED: 1
+
+📬 메일함: 1건 읽지 않음
+   reasonix-01: 1건 읽지 않음 (P0:0 P1:1)
+
+🧠 기억: L1 0파일, L2 아카이브 0
 ```
 
-자동 감쇠: SHARD가 80줄을 초과하면 오래된 항목이 자동으로 아카이브됩니다.
+<br/>
 
-### 작업 생명주기
+## 🎯 누가 사용하나요?
 
-```
-DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE
-                                  ↓
-                               REWORK → IN_PROGRESS
-```
+| 당신은... | 얻을 수 있는 것... |
+|:--|:--|
+| 🧑‍💻 **여러 AI 코딩 도구를 동시에 쓰는 개발자** | 모든 에이전트가 같은 프로젝트 상태를 공유, 반복 설명 없음 |
+| 🏗️ **AI 팀을 구축하는 아키텍트** | 표준화된 역할 권한, 작업 배분, 검토 프로세스 |
+| 🔬 **AI 에이전트 연구자** | 재사용 가능한 멀티 에이전트 협업 프로토콜 참조 구현 |
+| 🤖 **AI 에이전트 개발자** | MCP 플러그인으로 당신의 에이전트를 어디든 즉시 통합 |
 
-작업은 총공의 리뷰 후 사용자가 최종 승인합니다.
+<br/>
 
-### 인박스 시스템
+## 📖 완전한 실제 시나리오
 
-우선순위(P0-P3), 메시지 유형, 관련 작업, 응답 필요 플래그를 갖춘 구조화된 메시징.
+> **시나리오**: 양적 거래 시스템을 개발 중. Claude Code로 핵심 코드를 작성하고, WorkBuddy로 작업 스케줄링과 모니터링을, Reasonix로 코드 리뷰를 수행합니다.
 
-### 핸드셰이크 프로토콜
-
-각 에이전트가 프로젝트에 참여할 때의 첫 번째 동작:
-
-1. `MANIFEST.md` 읽기 — 시스템 규칙, 에이전트 등록부
-2. `SHARD.md` 읽기 — 현재 상태 (≤80줄)
-3. 배지 `BADGE-{id}.md` 읽기/신청하기
-4. `inbox/{id}/`의 읽지 않은 메시지 확인
-5. `tasks/`에서 자기 활성 작업 확인
-6. 핸드셰이크 요약 출력 후 사용자에게 응답
-
-## CLI 명령어
+### 1단계: 프로젝트 초기화
 
 ```bash
-# 시스템
-collab init                           협업 시스템 초기화
-collab status                         전체 상태 개요
-collab handshake <agent-id>           에이전트 핸드셰이크
-
-# 배지
-collab badge issue <id> --role <L>    배지 발급
-collab badge show <id>                배지 보기
-collab badge list                     전체 배지 목록
-
-# 작업
-collab task create <title>            작업 생성
-collab task list                      작업 목록
-collab task status <id>               작업 상세
-collab task update <id> <status>      상태 업데이트
-
-# 인박스
-collab inbox check <id>               읽지 않음 확인
-collab inbox send                     메시지 보내기
-collab inbox read <id> <msg-id>       메시지 읽기
-collab inbox done <id> <msg-id>       완료 표시
-
-# 기억
-collab memory compact                 기억 압축
-collab memory stats                   기억 통계
-collab memory archive <date>          날짜별 아카이브
-
-# 충돌
-collab conflict list                  충돌 목록
-collab conflict resolve <id>          충돌 해결
-
-# 하트비트
-collab heartbeat <agent-id>           지속 모니터링 시작
-collab heartbeat <agent-id> --once    단일 확인 (exit 2 = 높은 우선순위)
-collab heartbeat <agent-id> --interval 60  사용자 정의 간격 (초)
-
-# MCP 서버
-collab mcp                            MCP 서버 시작 (stdio JSON-RPC)
+collab init --project "양적 거래 시스템"
 ```
 
-## 파일 구조
+### 2단계: 배지 발급
 
-```
-.shared/
-├── MANIFEST.md              시스템 선언 + 에이전트 등록부
-├── SHARD.md                 L0 활성 기억 (≤80줄)
-├── BADGE-{agent-id}.md      에이전트별 배지 (다중 배지 병렬)
-├── inbox/{agent-id}/        메시지 수신함 (에이전트별 디렉토리)
-│   └── 001-{topic}.md       구조화된 메시지 (frontmatter 포함)
-├── tasks/T-xxx.md           작업 파일 (상태 머신 + 진행 로그)
-├── memory/                  L1 기억 조각 (주제별, 각 ≤50줄)
-│   ├── decisions.md
-│   ├── lessons.md
-│   └── architecture.md
-├── archive/                 L2 아카이브 (날짜별, 각 ≤50줄)
-│   └── 2026-06-06.md
-└── conflicts/               충돌 기록 (중재 대기)
-    └── C-{timestamp}.md
+```bash
+collab badge issue claude-01 --role L4 --assigned-by user     # 총공 (전체 권한)
+collab badge issue workbuddy-01 --role L1 --assigned-by user  # 실행자
+collab badge issue reasonix-01 --role L3 --assigned-by user   # 리뷰어
 ```
 
-## 에이전트 통합 가이드
+### 3단계: 총공이 작업 배분
 
-### Claude Code
+```bash
+collab task create "매일 장 마감 후 데이터 동기화" \
+  --assignee workbuddy-01 --priority P1 \
+  --deadline "2026-06-09T09:30:00+08:00" --by claude-01
+```
+
+### 4단계: 에이전트 간 통신
+
+```bash
+collab inbox send \
+  --from workbuddy-01 --to claude-01 \
+  --title "데이터 동기화 스크립트 완료, 검토 부탁드립니다" \
+  --priority P1 --type review_request \
+  --body "스크립트: scripts/data_sync.py, 로컬 테스트 통과" \
+  --task T-001 --needs-reply
+```
+
+### 5단계: Claude가 다음 시작 시 자동 인식
+
+```
+🤝 핸드셰이크 완료
+🪪 배지: L4 총공 | 📬 읽지 않음: 1건(P1) | 📋 활성 작업: 2건
+⚠️ P1 읽지 않은 메시지 1건: "데이터 동기화 스크립트 완료, 검토 부탁드립니다"
+```
+
+**"WorkBuddy가 메시지를 보냈다"고 수동으로 알려줄 필요 없습니다——Claude가 스스로 압니다.**
+
+<br/>
+
+## 🏗️ 아키텍처
+
+```
+당신의 프로젝트/
+├── .shared/                        ← 협업 시스템 루트
+│   ├── MANIFEST.md                    시스템 선언 + 역할 정의
+│   ├── SHARD.md                       L0 활성 기억 (필수 읽기, ≤80줄)
+│   ├── BADGE-claude-01.md             Claude의 배지
+│   ├── BADGE-workbuddy-01.md          WorkBuddy의 배지
+│   ├── inbox/{agent-id}/             메시지 수신함
+│   ├── tasks/T-xxx.md               작업 파일 (상태 머신)
+│   ├── memory/                        L1 기억 조각
+│   ├── archive/                       L2 아카이브 (자동 압축)
+│   └── conflicts/                     충돌 기록
+├── .claude/CLAUDE.md                ← Claude Code 핸드셰이크 지시
+├── .reasonix/system.md              ← Reasonix 핸드셰이크 지시
+└── reasonix.toml                    ← Reasonix MCP 플러그인 설정
+```
+
+<br/>
+
+## 🪪 배지 권한 상세
+
+```
+L4 총공 ──────┬── 전체 읽기/쓰기 + 작업 배정 + 승격/강등 + 배지 관리
+              │
+L3 리뷰어 ────┤── 작업 승인 + SHARD 쓰기 + 기억 쓰기
+              │
+L2 기여자 ────┤── 기억 쓰기 + 검토 제출
+              │
+L1 실행자 ────┤── 자기 작업 쓰기 + inbox 쓰기
+              │
+L0 관찰자 ────┴── 읽기 전용
+```
+
+<br/>
+
+## 🧠 기억 감쇠 메커니즘
+
+```
+           ┌──────────────┐
+           │   SHARD.md   │  ← L0: "지금 사실인 것"만 기록 (≤80줄)
+           └──────┬───────┘
+                  │ 80줄 초과 or 작업 완료
+                  ▼
+           ┌──────────────┐
+           │   memory/    │  ← L1: 주제별 (≤50줄/파일)
+           └──────┬───────┘
+                  │ 매주 or L1 초과
+                  ▼
+           ┌──────────────┐
+           │   archive/   │  ← L2: 날짜별 압축 (≤50줄/일)
+           └──────────────┘
+```
+
+**효과**: 새 에이전트는 80줄만 읽으면 전체를 파악.
+
+<br/>
+
+## 🔌 에이전트 통합 가이드
+
+### Claude Code (1줄)
 
 ```bash
 cat node_modules/collab-cli/src/templates/CLAUDE_PROTOCOL.md >> .claude/CLAUDE.md
 ```
 
-### Reasonix
+### Reasonix (3가지 방법)
 
-**방법 A: 프로토콜 주입 (권장)**
-
-```bash
-mkdir -p .reasonix
-cp node_modules/collab-cli/src/templates/REASONIX_PROTOCOL.md .reasonix/system.md
-```
-
-**방법 B: 사용자 정의 명령어**
-
-```bash
-mkdir -p .reasonix/commands
-cp node_modules/collab-cli/src/templates/reasonix-commands/collab.md .reasonix/commands/
-```
-
-**방법 C: MCP 플러그인 (가장 강력한 통합)**
-
-`reasonix.toml`에 설정:
+**방법 A: MCP 플러그인 (추천)** — `reasonix.toml`에 추가:
 
 ```toml
 [[plugins]]
@@ -183,74 +237,102 @@ command = "collab"
 args = ["mcp"]
 ```
 
-Reasonix가 12개의 collab 도구(`mcp__collab__inbox_check` 등)를 네이티브로 사용 가능.
+12개 도구(`mcp__collab__inbox_check` 등)를 네이티브로 사용.
 
-### WorkBuddy
+**방법 B: 사용자 정의 명령어** — `/collab handshake`로 핸드셰이크.
 
-`AGENT_PROTOCOL.md`를 `.workbuddy/MEMORY.md`에 추가.
+**방법 C: 프로토콜 주입** — `.reasonix/system.md`에 배치.
 
-### Cursor
-
-`CURSOR_PROTOCOL.md`를 `.cursor/rules`에 통합.
-
-### Codex / 모든 에이전트
-
-`CODEX_PROTOCOL.md` 또는 `AGENT_PROTOCOL.md`를 프로젝트 루트나 에이전트의 지시 파일에 배치.
-
-## MCP 서버
-
-[Model Context Protocol](https://modelcontextprotocol.io/) 사양을 따르는 내장 MCP 서버 (stdio JSON-RPC 2.0).
-
-| MCP 도구 | 기능 |
-|:--|:--|
-| `collab_status` | 전체 상태 |
-| `collab_handshake` | 에이전트 핸드셰이크 |
-| `collab_inbox_check` | 읽지 않은 메시지 확인 |
-| `collab_inbox_send` | 메시지 보내기 |
-| `collab_inbox_read` | 메시지 읽기 (읽음 표시) |
-| `collab_task_create` | 작업 생성 |
-| `collab_task_list` | 작업 목록 |
-| `collab_task_update` | 작업 상태 업데이트 |
-| `collab_badge_issue` | 배지 발급 |
-| `collab_memory_stats` | 기억 통계 |
-| `collab_memory_compact` | 기억 압축 |
-| `collab_conflict_list` | 충돌 목록 |
-
-## 하트비트
-
-장시간 실행 에이전트를 위한 inbox 모니터링:
+### WorkBuddy / Cursor / Codex
 
 ```bash
-collab heartbeat claude-01            # 지속 모드 (5분 간격)
-collab heartbeat claude-01 --once     # 단일 확인
+# WorkBuddy
+cat node_modules/collab-cli/src/templates/AGENT_PROTOCOL.md >> .workbuddy/MEMORY.md
+
+# Cursor
+cat node_modules/collab-cli/src/templates/CURSOR_PROTOCOL.md >> .cursor/rules
+
+# Codex
+cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
+```
+
+<br/>
+
+## 📬 메시징 시스템
+
+```bash
+# 보내기
+collab inbox send --from claude-01 --to workbuddy-01 \
+  --title "긴급: 손절매 수정" --priority P0 --type task \
+  --body "손절매 발동 후 포지션이 정리되지 않음" --needs-reply
+
+# 확인
+collab inbox check workbuddy-01
+
+# 읽음 처리
+collab inbox read workbuddy-01 MSG-001
+```
+
+| 메시지 유형 | 용도 |
+|:--|:--|
+| `task` | 작업 배정 |
+| `review_request` | 검토 요청 |
+| `approval` | 승인/거부 |
+| `question` | 질문 |
+| `notification` | 알림 |
+| `response` | 응답 |
+
+<br/>
+
+## 💓 하트비트
+
+```bash
+collab heartbeat claude-01            # 상주 모드 (5분 간격)
+collab heartbeat claude-01 --once     # 단일 확인 (exit 2 = 높은 우선순위)
 collab heartbeat claude-01 --interval 60  # 사용자 정의 간격
 ```
 
-## 충돌 해결
+<br/>
 
-3단계 보호:
+## ⚡ 충돌 중재
 
-1. **예방** — 작업 `assignee` 명시, `scope`로 작업 디렉토리 제한
-2. **탐지** — frontmatter의 `last_updated_by` + `last_updated_at` 낙관적 잠금
-3. **중재** — `conflicts/`에 기록, 총공이 24시간 이내 해결
+3단계 보호: 예방(assignee 명시) → 감지(낙관적 잠금) → 중재(총공이 24시간 이내)
 
-## 프로토콜 호환성
+<br/>
 
-모든 에이전트가 동일한 `.shared/` 파일 구조를 공유합니다. 프로토콜 계층은 **순수 Markdown + YAML** — 에이전트별 메커니즘에 의존하지 않습니다.
+## 🆚 다른 솔루션과 비교
 
-- **파일 = 프로토콜** — 파일 읽기/쓰기가 가능한 에이전트는 모두 참여 가능
-- **CLI는 편의성** — 에이전트는 `read_file` / `write_file`로 직접 조작도 가능
-- **MCP는 확장** — 플러그인 메커니즘으로 구조화된 도구 호출 제공
+| 특징 | 수동 조율 | Git 브랜치 | **collab-cli** |
+|:--|:--:|:--:|:--:|
+| 실시간 메시지 | ❌ | ❌ | ✅ |
+| 역할 권한 제어 | ❌ | 브랜치 단위 | 파일 단위 |
+| 공유 기억 | 구두 | 커밋 메시지 | 구조화 3계층 기억 |
+| 작업 생명주기 | 구두 | PR/Issue | 내장 상태 머신 |
+| 새 에이전트 참여 비용 | 전부 재설명 | clone | 핸드셰이크로 자동 정렬 |
+| 토큰 소비 | 전체 재로드 | N/A | ≤80줄 |
 
-## 개발
+<br/>
+
+## 🛠️ 개발
 
 ```bash
+git clone https://github.com/yinsang0910-star/collab-cli.git
+cd collab-cli
 npm install
-npm test          # 64개 테스트
-npm link          # 로컬 개발
-npm publish       # npm에 게시
+npm test          # 64개 테스트 전체 통과
+npm link
 ```
 
-## 라이선스
+<br/>
+
+## 📄 License
 
 MIT
+
+<br/>
+
+---
+
+<p align="center">
+  이 프로젝트가 도움이 되었다면 ⭐를 눌러주세요!
+</p>
