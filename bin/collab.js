@@ -36,6 +36,7 @@ import * as inboxCmd from '../src/commands/inbox.js';
 import * as memoryCmd from '../src/commands/memory.js';
 import * as conflictCmd from '../src/commands/conflict.js';
 import * as heartbeatCmd from '../src/commands/heartbeat.js';
+import * as nodeCmd from '../src/commands/node.js';
 import { handshake } from '../src/core/protocol.js';
 
 // ── 参数解析 ──
@@ -71,6 +72,7 @@ function getSharedDir() {
 
 // ── 命令分发 ──
 
+(async () => {
 try {
   switch (command) {
     case 'init':
@@ -103,6 +105,9 @@ try {
     case 'mcp':
       cmdMcp();
       break;
+    case 'node':
+      await cmdNode();
+      break;
     case 'help':
     case '--help':
     case '-h':
@@ -126,6 +131,7 @@ try {
   console.error(`错误: ${err.message}`);
   process.exit(1);
 }
+})();
 
 // ── 命令实现 ──
 
@@ -515,6 +521,31 @@ function cmdMcp() {
   import(mcpPath);
 }
 
+async function cmdNode() {
+  const sharedDir = getSharedDir();
+  const nodeSubcommand = subcommand;
+
+  switch (nodeSubcommand) {
+    case 'start': {
+      const agents = getFlag('agents', 'claude-01');
+      const port = getFlag('port', '9527');
+      const token = getFlag('token');
+      await nodeCmd.startNode(sharedDir, { agents, port, token });
+      break;
+    }
+    case 'status': {
+      const status = nodeCmd.nodeStatus();
+      console.log(nodeCmd.formatNodeStatus(status));
+      break;
+    }
+    default:
+      console.error('用法: collab node <start|status>');
+      console.error('  collab node start [--agents <id1,id2>] [--port <port>] [--token <token>]');
+      console.error('  collab node status');
+      process.exit(1);
+  }
+}
+
 // ── 帮助和版本 ──
 
 function showHelp() {
@@ -553,6 +584,9 @@ collab — 多智能体协作任务体系 CLI
   heartbeat <agent-id> --once    单次检查（不长驻）
 
   mcp                            启动 MCP server（stdio JSON-RPC）
+
+  node start                     启动 LAN 节点（跨设备协作）
+  node status                    查看节点状态
 
 选项:
   --shared <dir>                 指定 .shared/ 目录路径
