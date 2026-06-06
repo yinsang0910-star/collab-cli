@@ -109,7 +109,8 @@ export function createConflictRecord(conflictsDir, conflict) {
   }
 
   const timestamp = now().replace(/[:.]/g, '-');
-  const id = `C-${timestamp}`;
+  const random = Math.random().toString(36).slice(2, 6);
+  const id = `C-${timestamp}-${random}`;
   const filePath = `${conflictsDir}/${id}.md`;
 
   const data = {
