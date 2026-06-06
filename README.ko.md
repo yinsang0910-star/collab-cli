@@ -49,6 +49,9 @@
 │   💓 하트비트         상주 에이전트의 inbox 자동 순회             │
 │   ⚡ 충돌 중재        낙관적 잠금 + 자동 감지 + 총공 재정         │
 │   🔌 MCP 서버        플러그인 통합, 12개 구조화 도구              │
+│   🌐 LAN 노드        크로스 디바이스 협업                        │
+│   🔄 자동 동기화    SHARD + tasks 10초마다 동기화                │
+│   🚀 설정 마법사    싱글/멀티 디바이스 초기화 가이드              │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -297,6 +300,30 @@ collab heartbeat claude-01 --interval 60  # 사용자 정의 간격
 ## ⚡ 충돌 중재
 
 3단계 보호: 예방(assignee 명시) → 감지(낙관적 잠금) → 중재(총공이 24시간 이내)
+
+<br/>
+
+## 🌐 LAN 노드 — 크로스 디바이스 협업
+
+다른 장치의 에이전트가 LAN을 통해 협업 가능. UDP 자동 발견, 제로 설정.
+
+| 파일 | 동기화? | 방법 |
+|:--|:--:|:--|
+| `SHARD.md` | ✅ | 버전 기반, 새로운 것이 승리 |
+| `tasks/` | ✅ | 상태 병합, 더 진행된 상태가 승리 |
+| `inbox/` | ❌ | 장치별 독립 |
+
+```bash
+# 설정 마법사
+collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
+
+# 장치 A
+collab node start --agents codex-1
+
+# 장치 B
+collab node start --agents codex-2 --token <token>
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
+```
 
 <br/>
 

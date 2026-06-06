@@ -49,6 +49,9 @@
 │   💓 ハートビート      常駐エージェントのinbox自動巡回           │
 │   ⚡ コンフリクト      楽観的ロック + 自動検出 + 総工裁定       │
 │   🔌 MCPサーバー      プラグイン統合、12の構造化ツール           │
+│   🌐 LANノード        クロスデバイス協働                        │
+│   🔄 自動同期        SHARD + tasks 10秒ごとに同期              │
+│   🚀 セットアップ    シングル/マルチデバイス初期化ガイド         │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -297,6 +300,30 @@ collab heartbeat claude-01 --interval 60  # カスタム間隔
 ## ⚡ コンフリクト解決
 
 3層防護：予防（assignee明示）→ 検出（楽観的ロック）→ 裁定（総工が24h以内）
+
+<br/>
+
+## 🌐 LAN ノード — クロスデバイス協働
+
+異なるデバイス上のエージェントがLAN経由で協働可能。UDP自動発見、ゼロ設定。
+
+| ファイル | 同期？ | 方法 |
+|:--|:--:|:--|
+| `SHARD.md` | ✅ | バージョンベース、新しい方が勝ち |
+| `tasks/` | ✅ | ステートマージ、より進んだステータスが勝ち |
+| `inbox/` | ❌ | デバイスごとに独立 |
+
+```bash
+# セットアップウィザード
+collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
+
+# デバイス A
+collab node start --agents codex-1
+
+# デバイス B
+collab node start --agents codex-2 --token <token>
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
+```
 
 <br/>
 
