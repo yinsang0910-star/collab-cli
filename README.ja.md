@@ -111,12 +111,12 @@ collab handshake claude-01   # Claudeが参加時に自動で全情報を読み�
 
 ## 📖 完全なリアルシナリオ
 
-> **シナリオ**：量化取引システムを開発中。Claude Codeでコアコードを書き、WorkBuddyでタスクスケジューリングと監視を、Reasonixでコードレビューを行う。
+> **シナリオ**：ECプラットフォームを開発中。Claude CodeでバックエンドAPIを書き、Reasonixでコードレビューを、スケジューラーエージェントで夜間バッチ処理を行う。
 
 ### Step 1: プロジェクト初期化
 
 ```bash
-collab init --project "量化取引システム"
+collab init --project "ECプラットフォーム"
 ```
 
 ### Step 2: バッジ発行
@@ -130,7 +130,7 @@ collab badge issue reasonix-01 --role L3 --assigned-by user   # レビュアー
 ### Step 3: 総工がタスクを配分
 
 ```bash
-collab task create "毎日のクローズ後データ同期" \
+collab task create "商品検索の最適化" \
   --assignee workbuddy-01 --priority P1 \
   --deadline "2026-06-09T09:30:00+08:00" --by claude-01
 ```
@@ -140,9 +140,9 @@ collab task create "毎日のクローズ後データ同期" \
 ```bash
 collab inbox send \
   --from workbuddy-01 --to claude-01 \
-  --title "データ同期スクリプト完了、レビューお願いします" \
+  --title "検索最適化スクリプト完了、レビューお願いします" \
   --priority P1 --type review_request \
-  --body "スクリプト: scripts/data_sync.py、ローカルテスト通過済み" \
+  --body "スクリプト: services/search.py、ローカルテスト通過済み" \
   --task T-001 --needs-reply
 ```
 
@@ -151,7 +151,7 @@ collab inbox send \
 ```
 🤝 ハンドシェイク完了
 🪪 バッジ: L4 総工 | 📬 未読: 1件(P1) | 📋 アクティブタスク: 2件
-⚠️ P1未読メッセージが1件あります: "データ同期スクリプト完了、レビューお願いします"
+⚠️ P1未読メッセージが1件あります: "検索最適化スクリプト完了、レビューお願いします"
 ```
 
 **「WorkBuddyからメッセージが来た」と手動で教える必要はありません——Claudeが自動で知ります。**

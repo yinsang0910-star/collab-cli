@@ -111,12 +111,12 @@ collab handshake claude-01   # Claude가 참여 시 자동으로 모든 정보�
 
 ## 📖 완전한 실제 시나리오
 
-> **시나리오**: 양적 거래 시스템을 개발 중. Claude Code로 핵심 코드를 작성하고, WorkBuddy로 작업 스케줄링과 모니터링을, Reasonix로 코드 리뷰를 수행합니다.
+> **시나리오**: 이커머스 플랫폼을 개발 중. Claude Code로 백엔드 API를 작성하고, Reasonix로 코드 리뷰를, 스케줄러 에이전트로 야간 배치 작업을 수행합니다.
 
 ### 1단계: 프로젝트 초기화
 
 ```bash
-collab init --project "양적 거래 시스템"
+collab init --project "이커머스 플랫폼"
 ```
 
 ### 2단계: 배지 발급
@@ -130,7 +130,7 @@ collab badge issue reasonix-01 --role L3 --assigned-by user   # 리뷰어
 ### 3단계: 총공이 작업 배분
 
 ```bash
-collab task create "매일 장 마감 후 데이터 동기화" \
+collab task create "상품 검색 최적화" \
   --assignee workbuddy-01 --priority P1 \
   --deadline "2026-06-09T09:30:00+08:00" --by claude-01
 ```
@@ -140,9 +140,9 @@ collab task create "매일 장 마감 후 데이터 동기화" \
 ```bash
 collab inbox send \
   --from workbuddy-01 --to claude-01 \
-  --title "데이터 동기화 스크립트 완료, 검토 부탁드립니다" \
+  --title "검색 최적화 스크립트 완료, 검토 부탁드립니다" \
   --priority P1 --type review_request \
-  --body "스크립트: scripts/data_sync.py, 로컬 테스트 통과" \
+  --body "스크립트: services/search.py, 로컬 테스트 통과" \
   --task T-001 --needs-reply
 ```
 
@@ -151,7 +151,7 @@ collab inbox send \
 ```
 🤝 핸드셰이크 완료
 🪪 배지: L4 총공 | 📬 읽지 않음: 1건(P1) | 📋 활성 작업: 2건
-⚠️ P1 읽지 않은 메시지 1건: "데이터 동기화 스크립트 완료, 검토 부탁드립니다"
+⚠️ P1 읽지 않은 메시지 1건: "검색 최적화 스크립트 완료, 검토 부탁드립니다"
 ```
 
 **"WorkBuddy가 메시지를 보냈다"고 수동으로 알려줄 필요 없습니다——Claude가 스스로 압니다.**
@@ -263,8 +263,8 @@ cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
 ```bash
 # 보내기
 collab inbox send --from claude-01 --to workbuddy-01 \
-  --title "긴급: 손절매 수정" --priority P0 --type task \
-  --body "손절매 발동 후 포지션이 정리되지 않음" --needs-reply
+  --title "긴급: 결제 타임아웃 수정" --priority P0 --type task \
+  --body "결제 API 타임아웃, 주문이 대기 상태에 머무름" --needs-reply
 
 # 확인
 collab inbox check workbuddy-01

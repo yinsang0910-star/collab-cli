@@ -111,12 +111,12 @@ collab handshake claude-01   # Claude 进入时自动读取一切
 
 ## 📖 一个完整的真实场景
 
-> **场景**：你正在开发一个量化交易系统，用 Claude Code 写核心代码，用 WorkBuddy 做定时任务和监控，用 Reasonix 做代码审查。
+> **场景**：你正在开发一个电商平台，用 Claude Code 写后端 API，用 Reasonix 做代码审查，用一个定时任务 agent 跑夜间批处理。
 
 ### 第 1 步：初始化项目
 
 ```bash
-collab init --project "量化交易系统"
+collab init --project "电商平台"
 ```
 
 这会在项目下创建 `.shared/` 目录，包含所有协作文件。
@@ -138,14 +138,14 @@ collab badge issue reasonix-01 --role L3 --assigned-by user
 
 ```bash
 # Claude（总工）给 WorkBuddy 分配任务
-collab task create "每日收盘后数据同步" \
+collab task create "商品搜索优化" \
   --assignee workbuddy-01 \
   --priority P1 \
   --deadline "2026-06-09T09:30:00+08:00" \
   --by claude-01
 
 # Claude 给自己分配任务
-collab task create "资金隔离方案集成" \
+collab task create "支付模块重构" \
   --assignee claude-01 \
   --priority P0 \
   --by user
@@ -158,10 +158,10 @@ collab task create "资金隔离方案集成" \
 collab inbox send \
   --from workbuddy-01 \
   --to claude-01 \
-  --title "数据同步脚本已完成，请审查" \
+  --title "搜索优化脚本已完成，请审查" \
   --priority P1 \
   --type review_request \
-  --body "脚本位于 scripts/data_sync.py，已通过本地测试" \
+  --body "脚本位于 services/search.py，已通过本地测试" \
   --task T-001 \
   --needs-reply
 ```
@@ -173,7 +173,7 @@ Claude Code 打开项目时，握手协议自动执行：
 ```
 🤝 握手完成
 🪪 工牌: L4 总工 | 📬 未读: 1条(P1) | 📋 活跃任务: 2个
-⚠️ 有 1 条 P1 未读消息需优先处理: "数据同步脚本已完成，请审查"
+⚠️ 有 1 条 P1 未读消息需优先处理: "搜索优化脚本已完成，请审查"
 ```
 
 **不需要你手动告诉 Claude "WorkBuddy 给你发了消息"——它自己就知道。**
@@ -191,7 +191,7 @@ collab inbox send \
   --to workbuddy-01 \
   --title "审查通过" \
   --type response \
-  --body "脚本质量良好，已合并" \
+  --body "代码质量良好，已合并" \
   --task T-001
 ```
 
@@ -211,8 +211,8 @@ collab inbox send \
 │   │   │   └── 001-审查请求.md
 │   │   └── workbuddy-01/             WorkBuddy 的收件箱
 │   ├── tasks/
-│   │   ├── T-001-数据同步.md          任务文件（含状态机+进度日志）
-│   │   └── T-002-资金隔离.md
+│   │   ├── T-001-搜索优化.md          任务文件（含状态机+进度日志）
+│   │   └── T-002-支付重构.md
 │   ├── memory/                        L1 记忆片段（按主题，≤50行/文件）
 │   │   ├── decisions.md               决策记录
 │   │   ├── lessons.md                 经验教训
@@ -344,10 +344,10 @@ cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
 collab inbox send \
   --from claude-01 \
   --to workbuddy-01 \
-  --title "紧急：修复止损逻辑" \
+  --title "紧急：修复支付超时" \
   --priority P0 \
   --type task \
-  --body "止损触发后仓位未清空，需要立即修复" \
+  --body "支付接口超时未返回结果，订单卡在待支付状态" \
   --task T-003 \
   --needs-reply
 ```
@@ -361,7 +361,7 @@ $ collab inbox check workbuddy-01
 
 | ID     | 优先级 | 类型 | 来自      | 标题                  | 需回复 |
 |--------|--------|------|-----------|----------------------|:------:|
-| MSG-001| P0     | task | claude-01 | 紧急：修复止损逻辑    |   ✅   |
+| MSG-001| P0     | task | claude-01 | 紧急：修复支付超时    |   ✅   |
 ```
 
 ### 消息类型
@@ -398,7 +398,7 @@ collab heartbeat claude-01 --interval 60  # 每分钟
 
 ```
 [COLLAB_HEARTBEAT] {"type":"new_message","agentId":"claude-01","message":{"id":"MSG-001","priority":"P0",...}}
-🚨 新消息: [P0] workbuddy-01 → 紧急：修复止损逻辑 (需回复)
+🚨 新消息: [P0] workbuddy-01 → 紧急：修复支付超时 (需回复)
 ```
 
 <br/>
