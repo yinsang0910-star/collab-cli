@@ -8,11 +8,14 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import * as inboxCmd from '../commands/inbox.js';
 import * as taskCmd from '../commands/task.js';
 import * as statusCmd from '../commands/status.js';
 import * as yaml from '../core/yaml.js';
 import { now } from '../utils/timestamp.js';
+
+const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
 const DEFAULT_PORT = 9527;
 
@@ -73,8 +76,12 @@ export class CollabServer {
   // ── 内部方法 ──
 
   async _handleRequest(req, res) {
-    // CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS: 仅允许 localhost 和同局域网
+    const origin = req.headers['origin'] || '';
+    const isLocal = !origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.');
+    if (isLocal) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
@@ -84,11 +91,12 @@ export class CollabServer {
       return;
     }
 
-    // Token 认证
+    // Token 认证（timing-safe 比较）
     if (this.token) {
       const authHeader = req.headers['authorization'];
       const reqToken = authHeader?.replace('Bearer ', '');
-      if (reqToken !== this.token) {
+      if (!reqToken || reqToken.length !== this.token.length ||
+          !crypto.timingSafeEqual(Buffer.from(reqToken), Buffer.from(this.token))) {
         this._json(res, 401, { error: 'Unauthorized' });
         return;
       }
@@ -180,7 +188,7 @@ export class CollabServer {
       this._json(res, 404, { error: `Not found: ${path}` });
 
     } catch (err) {
-      this._json(res, 500, { error: err.message });
+      this._json(res, 500, { error: 'Internal server error' });
     }
   }
 
@@ -374,7 +382,16 @@ export class CollabServer {
   _readBody(req) {
     return new Promise((resolve, reject) => {
       let data = '';
-      req.on('data', chunk => data += chunk);
+      let size = 0;
+      req.on('data', chunk => {
+        size += chunk.length;
+        if (size > MAX_BODY_SIZE) {
+          req.destroy();
+          reject(new Error('Request body too large (max 1MB)'));
+          return;
+        }
+        data += chunk;
+      });
       req.on('end', () => {
         try {
           resolve(data ? JSON.parse(data) : {});

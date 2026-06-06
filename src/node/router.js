@@ -8,6 +8,8 @@
 
 import * as inboxCmd from '../commands/inbox.js';
 
+const REQUEST_TIMEOUT = 10000; // 10 秒
+
 export class Router {
   /**
    * @param {Object} opts
@@ -81,6 +83,7 @@ export class Router {
           related_task: message.related_task,
           requires_response: message.requires_response || false,
         }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       });
 
       const result = await response.json();
@@ -120,6 +123,7 @@ export class Router {
         `http://${peer.host}:${peer.port}/api/inbox/check/${agentId}`,
         {
           headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {},
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT),
         }
       );
       const result = await response.json();
@@ -153,6 +157,7 @@ export class Router {
           ...(this.token ? { 'Authorization': `Bearer ${this.token}` } : {}),
         },
         body: JSON.stringify(shardData),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       });
 
       return await response.json();
@@ -175,6 +180,7 @@ export class Router {
       try {
         const response = await fetch(`http://${peer.host}:${peer.port}/api/status`, {
           headers: this.token ? { 'Authorization': `Bearer ${this.token}` } : {},
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT),
         });
         const status = await response.json();
         results.push({ ...status, host: peer.host, reachable: true });

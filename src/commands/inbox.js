@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import * as yaml from '../core/yaml.js';
 import { now } from '../utils/timestamp.js';
 
@@ -86,18 +87,12 @@ export function send(sharedDir, { from, to, priority, type, title, body, related
     fs.mkdirSync(inboxDir, { recursive: true });
   }
 
-  // 生成递增 ID
-  const existingIds = fs.readdirSync(inboxDir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => {
-      const match = f.match(/^(\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    });
-  const nextId = Math.max(0, ...existingIds) + 1;
-  const msgId = `MSG-${String(nextId).padStart(3, '0')}`;
+  // 生成唯一 ID（防碰撞）
+  const shortId = crypto.randomUUID().slice(0, 8);
+  const msgId = `MSG-${shortId}`;
 
   const safeTitle = title.replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 30);
-  const fileName = `${String(nextId).padStart(3, '0')}-${safeTitle}.md`;
+  const fileName = `${shortId}-${safeTitle}.md`;
   const filePath = path.join(inboxDir, fileName);
 
   const data = {
@@ -209,9 +204,11 @@ function findMessageFile(sharedDir, agentId, msgId) {
 
   const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.md'));
 
-  // 先按文件名匹配
+  // 先按文件名精确匹配（文件名格式: {id}-{title}.md）
   for (const file of files) {
-    if (file.includes(msgId)) return path.join(inboxDir, file);
+    if (file.startsWith(msgId + '-') || file.startsWith(msgId + '.')) {
+      return path.join(inboxDir, file);
+    }
   }
 
   // 再按 frontmatter id 匹配

@@ -42,6 +42,8 @@ export class OptimisticLock {
    */
   acquire(agentId) {
     if (!fs.existsSync(this.filePath)) {
+      // 文件不存在，标记为"即将创建"，后续 acquire 需要检测
+      this._lastSeen = '__creating__';
       return { acquired: true };
     }
 
@@ -49,8 +51,14 @@ export class OptimisticLock {
     const currentUpdated = data.last_updated_at || null;
     const currentBy = data.last_updated_by || null;
 
+    // 首次 acquire（_lastSeen 未设置）：读取当前版本作为基线
+    if (!this._lastSeen && currentUpdated) {
+      this._lastSeen = currentUpdated;
+      return { acquired: true };
+    }
+
     // 检查是否自上次读取以来被修改
-    if (this._lastSeen && currentUpdated && currentUpdated !== this._lastSeen) {
+    if (this._lastSeen && this._lastSeen !== '__creating__' && currentUpdated && currentUpdated !== this._lastSeen) {
       return {
         acquired: false,
         reason: 'file_modified_since_last_read',

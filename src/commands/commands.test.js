@@ -98,12 +98,15 @@ describe('task', () => {
       priority: 'P0',
     });
     assert.equal(result.success, true);
-    assert.equal(result.id, 'T-001');
+    assert.ok(result.id.startsWith('T-'));
   });
 
-  it('should create multiple tasks with incrementing IDs', () => {
-    const r2 = taskCmd.create(sharedDir, { title: 'Task 2' });
-    assert.equal(r2.id, 'T-002');
+  it('should create multiple tasks with unique IDs', () => {
+    const r1 = taskCmd.create(sharedDir, { title: 'Task A' });
+    const r2 = taskCmd.create(sharedDir, { title: 'Task B' });
+    assert.notEqual(r1.id, r2.id);
+    assert.ok(r1.id.startsWith('T-'));
+    assert.ok(r2.id.startsWith('T-'));
   });
 
   it('should list tasks', () => {
@@ -117,7 +120,9 @@ describe('task', () => {
   });
 
   it('should update status with valid transition', () => {
-    const result = taskCmd.updateStatus(sharedDir, 'T-001', 'IN_PROGRESS', {
+    const tasks = taskCmd.list(sharedDir, { status: 'ASSIGNED' });
+    const task = tasks[0];
+    const result = taskCmd.updateStatus(sharedDir, task.id, 'IN_PROGRESS', {
       operator: 'claude-01',
       note: 'started',
     });
@@ -127,14 +132,18 @@ describe('task', () => {
   });
 
   it('should reject invalid transition', () => {
-    const result = taskCmd.updateStatus(sharedDir, 'T-001', 'DONE', { operator: 'claude-01' });
+    const tasks = taskCmd.list(sharedDir, { status: 'IN_PROGRESS' });
+    const task = tasks[0];
+    const result = taskCmd.updateStatus(sharedDir, task.id, 'DONE', { operator: 'claude-01' });
     assert.equal(result.success, false);
     assert.ok(result.error.includes('非法状态转换'));
   });
 
   it('should allow REVIEW → DONE', () => {
-    taskCmd.updateStatus(sharedDir, 'T-001', 'REVIEW', { operator: 'claude-01' });
-    const result = taskCmd.updateStatus(sharedDir, 'T-001', 'DONE', { operator: 'user' });
+    const tasks = taskCmd.list(sharedDir, { status: 'IN_PROGRESS' });
+    const task = tasks[0];
+    taskCmd.updateStatus(sharedDir, task.id, 'REVIEW', { operator: 'claude-01' });
+    const result = taskCmd.updateStatus(sharedDir, task.id, 'DONE', { operator: 'user' });
     assert.equal(result.success, true);
   });
 });
@@ -153,7 +162,7 @@ describe('inbox', () => {
       requiresResponse: true,
     });
     assert.equal(result.success, true);
-    assert.equal(result.id, 'MSG-001');
+    assert.ok(result.id.startsWith('MSG-'));
   });
 
   it('should check unread messages', () => {
@@ -163,14 +172,16 @@ describe('inbox', () => {
   });
 
   it('should mark as read', () => {
-    inboxCmd.markRead(sharedDir, 'claude-01', 'MSG-001');
     const messages = inboxCmd.check(sharedDir, 'claude-01');
-    assert.equal(messages.length, 0);
+    const msgId = messages[0].id;
+    inboxCmd.markRead(sharedDir, 'claude-01', msgId);
+    const after = inboxCmd.check(sharedDir, 'claude-01');
+    assert.equal(after.length, 0);
   });
 
   it('should mark as done', () => {
-    inboxCmd.send(sharedDir, { from: 'wb-01', to: 'claude-01', title: 'Another' });
-    inboxCmd.markDone(sharedDir, 'claude-01', 'MSG-002');
+    const sendResult = inboxCmd.send(sharedDir, { from: 'wb-01', to: 'claude-01', title: 'Another' });
+    inboxCmd.markDone(sharedDir, 'claude-01', sendResult.id);
     const messages = inboxCmd.check(sharedDir, 'claude-01');
     assert.equal(messages.length, 0);
   });

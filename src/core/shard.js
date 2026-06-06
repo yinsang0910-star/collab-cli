@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as yaml from './yaml.js';
 import { OptimisticLock } from './fs-lock.js';
-import { now, today, isWithinDays } from '../utils/timestamp.js';
+import { now, today, isWithinDays, getTimezoneOffset } from '../utils/timestamp.js';
 import { countBodyLines, stripFrontmatter } from '../utils/markdown.js';
 
 const SHARD_MAX_LINES = 80;
@@ -112,7 +112,8 @@ export class ShardManager {
         ? `${today().slice(0, 4)}-${dateCell}`
         : dateCell;
 
-      if (isWithinDays(fullDate + 'T00:00:00+08:00', RECENT_DAYS)) {
+      const tz = getTimezoneOffset();
+      if (isWithinDays(fullDate + `T00:00:00${tz}`, RECENT_DAYS)) {
         toKeep.push(line);
       } else {
         toArchive.push({ date: fullDate, line });
@@ -127,6 +128,7 @@ export class ShardManager {
     this._writeArchive(toArchive);
 
     // 重建 SHARD（移除已归档行）
+    const tz = getTimezoneOffset();
     const newLines = [];
     let inTable = false;
     let keptCount = 0;
@@ -153,7 +155,7 @@ export class ShardManager {
         const fullDate = dateCell.length === 5
           ? `${today().slice(0, 4)}-${dateCell}`
           : dateCell;
-        if (isWithinDays(fullDate + 'T00:00:00+08:00', RECENT_DAYS)) {
+        if (isWithinDays(fullDate + `T00:00:00${tz}`, RECENT_DAYS)) {
           newLines.push(line);
           keptCount++;
         }

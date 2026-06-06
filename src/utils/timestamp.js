@@ -68,7 +68,7 @@ export function isWithinDays(isoTimestamp, days) {
  * 获取本地时区偏移字符串
  * @returns {string} e.g. "+08:00"
  */
-function getTimezoneOffset() {
+export function getTimezoneOffset() {
   const offset = -new Date().getTimezoneOffset();
   const sign = offset >= 0 ? '+' : '-';
   const abs = Math.abs(offset);

@@ -42,8 +42,11 @@ describe('checkOnce', () => {
   });
 
   it('should detect high priority', () => {
-    // Mark the previous as read
-    inboxCmd.markRead(sharedDir, 'agent-01', 'MSG-001');
+    // Mark all existing as read
+    const existing = inboxCmd.check(sharedDir, 'agent-01');
+    for (const msg of existing) {
+      inboxCmd.markRead(sharedDir, 'agent-01', msg.id);
+    }
 
     inboxCmd.send(sharedDir, {
       from: 'wb', to: 'agent-01', title: 'Urgent', priority: 'P0',
@@ -74,8 +77,13 @@ describe('formatHeartbeatStatus', () => {
 
 describe('startHeartbeat', () => {
   it('should detect new messages after start', (_, done) => {
-    // 先发一条已有消息（不会触发通知）
-    inboxCmd.markRead(sharedDir, 'agent-01', 'MSG-002');
+    // 先标记所有现有消息为已读
+    const existing = inboxCmd.check(sharedDir, 'agent-01');
+    for (const msg of existing) {
+      inboxCmd.markRead(sharedDir, 'agent-01', msg.id);
+    }
+
+    // 发一条已有消息（不会触发通知，因为 heartbeat 启动时已读）
     inboxCmd.send(sharedDir, {
       from: 'wb', to: 'agent-01', title: 'Existing', priority: 'P3',
     });

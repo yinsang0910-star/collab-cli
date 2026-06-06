@@ -6,6 +6,7 @@
  */
 
 import dgram from 'node:dgram';
+import crypto from 'node:crypto';
 import os from 'node:os';
 
 const BROADCAST_PORT = 9528;
@@ -22,10 +23,11 @@ export class Discovery {
    * @param {Function} opts.onPeerFound - 发现新 peer 时回调
    * @param {Function} opts.onPeerLost - peer 离线时回调
    */
-  constructor({ nodeId, agents, apiPort, onPeerFound, onPeerLost }) {
+  constructor({ nodeId, agents, apiPort, token, onPeerFound, onPeerLost }) {
     this.nodeId = nodeId;
     this.agents = agents;
     this.apiPort = apiPort;
+    this.token = token || null; // 共享密钥，用于 HMAC 签名
     this.onPeerFound = onPeerFound || (() => {});
     this.onPeerLost = onPeerLost || (() => {});
 
@@ -47,9 +49,15 @@ export class Discovery {
 
     this.socket.on('message', (msg, rinfo) => {
       try {
-        const data = JSON.parse(msg.toString());
+        const raw = msg.toString();
+        const data = JSON.parse(raw);
         // 忽略自己的广播
         if (data.nodeId === this.nodeId) return;
+        // HMAC 认证（如果设置了 token）
+        if (this.token && data.sig) {
+          const expected = this._sign(data.payload || data);
+          if (data.sig !== expected) return; // 签名不匹配，忽略
+        }
         this._handleAnnouncement(data, rinfo.address);
       } catch (e) {
         // 忽略无效消息
@@ -113,19 +121,30 @@ export class Discovery {
   // ── 内部方法 ──
 
   _announce() {
-    const msg = JSON.stringify({
+    const payload = {
       type: 'collab-discovery',
       nodeId: this.nodeId,
       agents: this.agents,
       apiPort: this.apiPort,
       timestamp: Date.now(),
-    });
+    };
+    const msg = this.token
+      ? JSON.stringify({ ...payload, sig: this._sign(payload) })
+      : JSON.stringify(payload);
     const buf = Buffer.from(msg);
     this.socket.send(buf, 0, buf.length, BROADCAST_PORT, BROADCAST_ADDR);
   }
 
+  _sign(payload) {
+    const data = JSON.stringify(payload);
+    return crypto.createHmac('sha256', this.token).update(data).digest('hex').slice(0, 16);
+  }
+
   _handleAnnouncement(data, fromHost) {
     if (data.type !== 'collab-discovery') return;
+    if (!data.nodeId || typeof data.nodeId !== 'string') return;
+    if (!Array.isArray(data.agents)) return;
+    if (typeof data.apiPort !== 'number') return;
 
     const existingPeer = this.peers.get(data.nodeId);
     const isNew = !existingPeer;

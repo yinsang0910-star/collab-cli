@@ -206,12 +206,24 @@ export async function pullFromPeer(peerHost, peerPort, sharedDir, token) {
       const tasksDir = path.join(sharedDir, 'tasks');
       if (!fs.existsSync(tasksDir)) fs.mkdirSync(tasksDir, { recursive: true });
 
+      const statusOrder = { DRAFT: 0, ASSIGNED: 1, IN_PROGRESS: 2, REVIEW: 3, DONE: 4, BLOCKED: -1 };
+
       for (const task of data.tasks) {
         if (!task.id) continue;
         const safeName = (task.title || 'task').replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 40);
         const filePath = path.join(tasksDir, `${task.id}-${safeName}.md`);
+
         if (!fs.existsSync(filePath)) {
+          // 新任务 → 创建
           yaml.write(filePath, task, `# ${task.id}: ${task.title}\n\nPulled from peer.`);
+        } else {
+          // 已有任务 → 状态合并（更"前进"的状态赢）
+          const local = yaml.safeRead(filePath);
+          const localStatus = local.data?.status || 'DRAFT';
+          const remoteStatus = task.status || 'DRAFT';
+          if ((statusOrder[remoteStatus] || 0) > (statusOrder[localStatus] || 0)) {
+            yaml.updateData(filePath, { status: remoteStatus, assignee: task.assignee });
+          }
         }
       }
       result.tasks = { count: data.tasks.length };

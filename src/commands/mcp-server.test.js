@@ -146,7 +146,7 @@ describe('MCP Server', () => {
         name: 'collab_task_create',
         arguments: { title: 'MCP Test Task', priority: 'P0', assignee: 'agent-01' },
       }, 3);
-      assert.ok(createResp.result.content[0].text.includes('T-001'));
+      assert.ok(createResp.result.content[0].text.includes('T-'));
 
       // List tasks
       const listResp = await mcpRequest(server, 'tools/call', {
@@ -179,7 +179,7 @@ describe('MCP Server', () => {
           body: 'This is a test message from MCP.',
         },
       }, 3);
-      assert.ok(sendResp.result.content[0].text.includes('MSG-001'));
+      assert.ok(sendResp.result.content[0].text.includes('MSG-'));
 
       // Check inbox
       const checkResp = await mcpRequest(server, 'tools/call', {

@@ -240,12 +240,6 @@ export function hasPermission(role, action) {
       return true;
     }
   }
-  // 检查该级别及以上的权限
-  for (const [lvl, perms] of Object.entries(permissions)) {
-    if (ROLE_HIERARCHY[lvl] <= level && perms.includes(action)) {
-      return true;
-    }
-  }
   return false;
 }
 

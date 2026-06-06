@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import * as yaml from '../core/yaml.js';
 import { now } from '../utils/timestamp.js';
 
@@ -44,15 +45,9 @@ export function create(sharedDir, { title, assignee, priority, reviewer, created
     fs.mkdirSync(tasksDir, { recursive: true });
   }
 
-  // 生成递增 ID
-  const existingIds = fs.readdirSync(tasksDir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => {
-      const match = f.match(/^T-(\d+)/);
-      return match ? parseInt(match[1]) : 0;
-    });
-  const nextId = Math.max(0, ...existingIds) + 1;
-  const taskId = `T-${String(nextId).padStart(3, '0')}`;
+  // 生成唯一 ID（防碰撞）
+  const shortId = crypto.randomUUID().slice(0, 8);
+  const taskId = `T-${shortId}`;
 
   const safeTitle = title.replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 40);
   const fileName = `${taskId}-${safeTitle}.md`;
@@ -238,7 +233,7 @@ function findTaskFile(sharedDir, taskId) {
   const tasksDir = path.join(sharedDir, 'tasks');
   if (!fs.existsSync(tasksDir)) return null;
 
-  const files = fs.readdirSync(tasksDir).filter(f => f.startsWith(taskId));
+  const files = fs.readdirSync(tasksDir).filter(f => f.startsWith(taskId + '-'));
   if (files.length === 0) return null;
 
   return path.join(tasksDir, files[0]);
