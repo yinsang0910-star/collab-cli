@@ -50,6 +50,8 @@
 │   ⚡ Conflict Resolution Optimistic lock + auto-detect + arb   │
 │   🔌 MCP Server         Plugin integration, 12 structured tools│
 │   🌐 LAN Node           Cross-device collaboration over LAN    │
+│   🔄 Auto Sync          SHARD + tasks sync every 10s           │
+│   🚀 Setup Wizard       Guided init for single/multi device    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -57,6 +59,29 @@
 <br/>
 
 ## 🚀 Quick start (30 seconds)
+
+### Option A: Setup wizard (recommended for beginners)
+
+```bash
+npm i -g collab-cli
+
+# Single device
+collab setup --devices 1 --project "My Project"
+
+# Multiple devices
+collab setup --devices 2 \
+  --project "My Project" \
+  --device-1 "DeviceA:codex-1@Codex" \
+  --device-2 "DeviceB:codex-2@Codex"
+```
+
+The wizard will:
+1. Initialize `.shared/` directory
+2. Issue badges for all agents
+3. Generate per-device startup instructions
+4. Create `peers.yaml` with LAN config (multi-device only)
+
+### Option B: Manual setup
 
 ```bash
 # Step 1: Install
@@ -431,31 +456,58 @@ Agents on **different devices** can collaborate over the local network. Zero con
 Device A (192.168.1.100)              Device B (192.168.1.101)
 ┌──────────────────────┐              ┌──────────────────────┐
 │ collab node start    │◄──HTTP──►   │ collab node start    │
-│ agents: claude-01    │  UDP auto   │ agents: workbuddy-01 │
+│ agents: codex-1      │  UDP auto   │ agents: codex-2      │
 │ port: 9527           │  discovery  │ port: 9527           │
-└──────────────────────┘              └──────────────────────┘
+│                      │             │                      │
+│ .shared/             │◄─ sync ──►│ .shared/             │
+│  SHARD.md ✅         │  every 10s  │  SHARD.md ✅         │
+│  tasks/ ✅           │             │  tasks/ ✅           │
+│  inbox/codex-1/ ❌   │  (per-device│  inbox/codex-2/ ❌   │
+└──────────────────────┘             └──────────────────────┘
 ```
 
-### Usage
+### What syncs across devices?
+
+| File | Synced? | How |
+|:--|:--:|:--|
+| `SHARD.md` | ✅ | Version-based push, newer wins |
+| `tasks/` | ✅ | Status-aware merge, advanced status wins |
+| `memory/` | ✅ | Full sync |
+| `inbox/` | ❌ | Per-device by design |
+| `MANIFEST.md` | ✅ | Same on all devices |
+| `BADGE-*.md` | ✅ | Same on all devices |
+
+### Quick start
 
 ```bash
-# Device A (Claude Code machine)
-collab node start --agents claude-01
+# Use the setup wizard (recommended)
+collab setup --devices 2 \
+  --device-1 "DeviceA:codex-1@Codex" \
+  --device-2 "DeviceB:codex-2@Codex"
 
-# Device B (WorkBuddy machine)
-collab node start --agents workbuddy-01
+# Device A — start node
+collab node start --agents codex-1
 
-# Now send messages across devices — automatic routing!
-collab inbox send --from claude-01 --to workbuddy-01 \
-  --title "Review request" --priority P1
+# Device B — start node (use token from setup output)
+collab node start --agents codex-2 --token <token>
+
+# Device B — first time: pull existing data from Device A
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
+
+# Now everything auto-syncs! Send messages across devices:
+collab inbox send --from codex-1 --to codex-2 --title "Review" --priority P1
 ```
 
-### How it works
+### Commands
 
-1. **UDP Broadcast** (port 9528): Nodes announce themselves every 5 seconds
-2. **Auto Discovery**: Nodes find each other on the LAN automatically
-3. **Smart Routing**: Messages route to local files or remote HTTP API
-4. **Token Auth**: Random token per node for security
+```bash
+collab node start                     Start LAN node
+collab node start --agents a,b        Specify agents on this node
+collab node start --port 9527         Custom API port
+collab node start --token <token>     Use specific auth token
+collab node pull --host <ip>          Pull SHARD + tasks from remote peer
+collab node status                    Show node info and discovered peers
+```
 
 ### API Endpoints
 
@@ -467,6 +519,63 @@ collab inbox send --from claude-01 --to workbuddy-01 \
 | `/api/inbox/check/:id` | GET | Check unread |
 | `/api/shard` | GET | Get SHARD.md |
 | `/api/tasks` | GET | List tasks |
+| `/api/sync/shard` | GET/POST | SHARD sync (pull/push) |
+| `/api/sync/tasks` | GET/POST | Tasks sync (pull/push) |
+
+<br/>
+
+## 📚 CLI Command Reference
+
+```bash
+# ── Setup ──
+collab setup                                    Interactive guided setup
+collab setup --devices 1 --project "My Project" # Single device
+collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
+
+# ── System ──
+collab init --project "Name"                    Initialize .shared/ directory
+collab status                                   Global status overview
+collab handshake <agent-id>                     Agent handshake check
+
+# ── Badges ──
+collab badge issue <id> --role <L0-L4>          Issue badge
+collab badge show <id>                          Show badge details
+collab badge list                               List all badges
+
+# ── Tasks ──
+collab task create <title> --assignee <id>      Create task
+collab task list [--status <s>] [--assignee <id>]  List/filter tasks
+collab task status <id>                         Task details
+collab task update <id> <status>                Update status
+
+# ── Inbox ──
+collab inbox check <id>                         Check unread messages
+collab inbox send --from <id> --to <id>         Send message
+collab inbox read <id> <msg-id>                 Read message (mark read)
+collab inbox done <id> <msg-id>                 Mark message done
+
+# ── Memory ──
+collab memory compact                           Auto-archive old entries
+collab memory stats                             Memory layer statistics
+collab memory archive <date>                    Archive by date
+
+# ── Conflicts ──
+collab conflict list                            List conflicts
+collab conflict resolve <id> --by <who>         Resolve conflict
+
+# ── Heartbeat ──
+collab heartbeat <id>                           Start persistent monitoring
+collab heartbeat <id> --once                    Single check (exit 2 = high priority)
+collab heartbeat <id> --interval 60             Custom interval (seconds)
+
+# ── LAN Node ──
+collab node start [--agents <ids>] [--port N]   Start LAN node
+collab node pull --host <ip> [--port N]         Pull SHARD + tasks from peer
+collab node status                              Show node + peers
+
+# ── MCP Server ──
+collab mcp                                      Start MCP server (stdio JSON-RPC)
+```
 
 <br/>
 
