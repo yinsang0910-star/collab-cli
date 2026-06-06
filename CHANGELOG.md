@@ -2,6 +2,31 @@
 
 All notable changes to collab-cli will be documented in this file.
 
+## [1.3.0] - 2026-06-06
+
+### Added
+
+- **Web Dashboard** — `collab dashboard --port 8080` opens a browser-based visualization with dark theme, auto-refresh (30s), showing SHARD progress, badges, tasks kanban, memory stats, and conflicts (`src/commands/dashboard.js`)
+- **MCP Enhancement** — Expanded from 12 to 17 tools:
+  - `collab_memory_write` — Write memory fragments to L1 layer
+  - `collab_shard_update` — Update SHARD sections (requires L3+)
+  - `collab_peer_list` — List discovered LAN peers
+  - `collab_conflict_create` — Create conflict records
+- **Git Integration** — `collab git init/sync/status` for managing `.shared/` under git:
+  - `collab git init` — Initialize `.shared/` as a git repository
+  - `collab git sync [--push] [--pull]` — Auto-commit changes with categorized summaries
+  - `collab git status` — Show uncommitted changes
+  - Auto-categorizes changes: SHARD / tasks / inbox / memory
+
+### Fixed
+
+- shard.js: Acquire lock before writing archive (prevents duplicate data on lock failure)
+- shard.js: Re-read fresh data object after lock acquisition (prevents stale writes)
+- memory.js: Atomic write (tmp + rename) for archive append (prevents TOCTOU corruption)
+- protocol.js: Check agent registration in MANIFEST during handshake
+- sync.js: Task change detection hash now includes assignee + priority (not just status)
+- server.js: Version comparison validates Number type before arithmetic
+
 ## [1.2.1] - 2026-06-06
 
 ### Security
