@@ -14,61 +14,209 @@
 
 <p align="center">
   <h1 align="center">🤝 collab-cli</h1>
-  <p align="center"><strong>Make multiple AI agents collaborate like a real team</strong></p>
-  <p align="center">A universal protocol + CLI tool that lets any AI agent — Claude Code, Reasonix, WorkBuddy, Cursor, Codex, and more — work together in the same project: sharing memory, assigning tasks, and communicating across sessions.</p>
+  <p align="center"><strong>A collaboration protocol that makes multiple AI agents work together like a real team</strong></p>
+  <p align="center">Works with Claude Code, Reasonix, Codex, WorkBuddy, Cursor, or any AI agent — on one device or across a LAN.</p>
 </p>
 
 <br/>
 
 ---
 
-## 🤔 Sound familiar?
+## Table of Contents
 
-| Problem | Scenario |
-|:--|:--|
-| 😵 **Out of sync** | Claude Code changed the code, WorkBuddy didn't know, implemented the same thing again |
-| 🔄 **Repeating yourself** | Every new session means re-explaining the project background, architecture, and past decisions |
-| 🚫 **Permission chaos** | An executor agent accidentally modified a config file it shouldn't have touched |
-| 📨 **Lost messages** | You sent a review request to another agent, but they never saw it |
-| 📝 **Memory bloat** | Shared docs keep growing, every startup reads hundreds of lines, wasting tokens |
+- [What is this?](#what-is-this)
+- [Two modes: Single device vs Multi-device](#two-modes)
+- [How it works (protocols & principles)](#how-it-works)
+- [Quick start](#quick-start)
+- [Core concepts](#core-concepts)
+- [Complete walkthrough](#complete-walkthrough)
+- [Agent integration](#agent-integration)
+- [LAN Node (cross-device)](#lan-node)
+- [CLI reference](#cli-reference)
+- [Architecture](#architecture)
+- [Development](#development)
 
-**collab-cli solves all of these.**
+---
+
+## What is this? {#what-is-this}
+
+**collab-cli solves a simple problem: multiple AI agents working on the same project don't know what each other are doing.**
+
+Without collab-cli:
+
+```
+Claude Code session 1  ──→  Changes the API
+Claude Code session 2  ──→  Doesn't know, changes it again
+WorkBuddy              ──→  Runs nightly job, doesn't see the change
+You (the human)        ──→  Explains everything from scratch every time
+```
+
+With collab-cli:
+
+```
+Claude Code  ──→  Writes to .shared/SHARD.md: "API changed to v2"
+WorkBuddy    ──→  Reads SHARD.md: "Oh, API changed, I'll update my job"
+You          ──→  Don't need to explain anything
+```
+
+**It's a shared folder (`.shared/`) + a protocol that all agents follow.** That's it. No servers required for single-device use.
 
 <br/>
 
-## ✨ Feature overview
+## Two modes: Single device vs Multi-device {#two-modes}
+
+collab-cli works in **two modes**. Choose based on where your agents run:
+
+### Mode 1: Single device (most users)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   🪪 Badge System       Issue identities to agents, L0-L4      │
-│   🧠 3-Layer Memory     Live (80 lines) + Fragments + Archive  │
-│   📋 Task Board         Create → Assign → Execute → Review     │
-│   📬 Inbox              P0-P3 priority, linked tasks, flags    │
-│   🤝 Handshake          Auto on startup: state + badge + msgs  │
-│   💓 Heartbeat          Persistent inbox monitoring             │
-│   ⚡ Conflict Resolution Optimistic lock + auto-detect + arb   │
-│   🔌 MCP Server         Plugin integration, 12 structured tools│
-│   🌐 LAN Node           Cross-device collaboration over LAN    │
-│   🔄 Auto Sync          SHARD + tasks sync every 10s           │
-│   🚀 Setup Wizard       Guided init for single/multi device    │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Your computer
+├── .shared/              ← One shared folder, all agents read/write here
+│   ├── SHARD.md             Current project state (≤80 lines)
+│   ├── BADGE-claude-01.md   Claude's identity & permissions
+│   ├── BADGE-workbuddy-01   WorkBuddy's identity & permissions
+│   ├── inbox/               Messages between agents
+│   ├── tasks/               Task board
+│   └── memory/              Knowledge fragments
+├── Claude Code           ← Reads .shared/
+├── WorkBuddy             ← Reads .shared/
+└── Codex                 ← Reads .shared/
 ```
+
+**When to use**: All your agents run on the same computer. This is the most common case.
+
+**How it works**: Pure filesystem. Agents read/write files in `.shared/`. Zero network, zero servers, zero configuration.
+
+### Mode 2: Multi-device (LAN)
+
+```
+Computer A (192.168.1.100)           Computer B (192.168.1.101)
+├── .shared/                         ├── .shared/
+│   ├── SHARD.md  ←──── sync ────→  │   ├── SHARD.md
+│   ├── tasks/   ←──── sync ────→   │   ├── tasks/
+│   ├── inbox/codex-1/ (own only)   │   ├── inbox/codex-2/ (own only)
+│   └── BADGE-*.md                  │   └── BADGE-*.md
+├── collab node :9527  ←── HTTP ──→ ├── collab node :9527
+└── Codex-1                          └── Codex-2
+```
+
+**When to use**: Your agents run on different computers on the same WiFi/LAN.
+
+**How it works**: Each computer runs a `collab node` (lightweight HTTP server). Nodes discover each other via UDP broadcast. SHARD.md and tasks sync every 10 seconds. Inbox messages push in real-time.
+
+### Which mode should I use?
+
+| Your setup | Mode | Command |
+|:--|:--|:--|
+| All agents on one computer | **Single device** | `collab setup --devices 1` |
+| Agents on 2+ computers, same LAN | **Multi-device** | `collab setup --devices 2` |
+| Agents on different networks | Not supported yet | Use git sync as workaround |
 
 <br/>
 
-## 🚀 Quick start (30 seconds)
+## How it works (protocols & principles) {#how-it-works}
 
-### Option A: Setup wizard (recommended for beginners)
+### Communication protocols
+
+collab-cli uses **four different protocols** depending on what's happening:
+
+| Protocol | Port | Used for | When |
+|:--|:--|:--|:--|
+| **Filesystem** | N/A | SHARD, tasks, badges, memory | Single-device mode (always) |
+| **UDP Broadcast** | 9528 | Peer discovery | Multi-device mode only |
+| **HTTP REST** | 9527 | Message routing, SHARD sync, tasks sync | Multi-device mode only |
+| **MCP (JSON-RPC)** | stdio | Plugin integration with Reasonix/Claude Desktop | Optional |
+
+### Core principle: Files are the protocol
+
+The entire system is built on **plain Markdown files with YAML frontmatter**. Any agent that can read and write files can participate. No special SDK, no API client, no runtime dependency.
+
+```
+---
+id: MSG-001
+from: claude-01
+to: workbuddy-01
+priority: P1
+status: unread
+---
+
+# Please review the login module
+
+The code is at src/auth/login.py.
+```
+
+This is what a message looks like. It's just a file. Any text editor can read it. Any AI agent can parse it.
+
+### Core principle: Role-based access control
+
+Every agent gets a **badge** when joining a project. The badge defines what the agent can and cannot do:
+
+```
+L4 Chief Engineer ──┬── Full access (read/write everything)
+                    │
+L3 Reviewer ────────┤── Can approve tasks, write SHARD
+                    │
+L2 Contributor ─────┤── Can write memory, submit reviews
+                    │
+L1 Executor ────────┤── Can write own tasks + inbox
+                    │
+L0 Observer ────────┴── Read-only
+```
+
+Different sessions of the same agent can hold different badges. Badges expire when the session ends.
+
+### Core principle: 3-layer memory with auto-decay
+
+To prevent memory bloat (every agent reading hundreds of lines), memory is split into three layers:
+
+```
+L0  SHARD.md     ← "What's true right now" (≤80 lines, every agent reads this)
+L1  memory/       ← "What we've decided" (by topic, ≤50 lines each)
+L2  archive/      ← "What happened before" (by date, only consulted when needed)
+```
+
+When SHARD exceeds 80 lines, old entries automatically move to archive/. **New agents only need to read 80 lines to understand the full picture.**
+
+### Core principle: Task state machine
+
+Every task follows a strict lifecycle:
+
+```
+DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE
+                                  ↓
+                               REWORK → IN_PROGRESS
+```
+
+Tasks cannot skip REVIEW. The Chief Engineer reviews, then the human gives final approval.
+
+### Core principle: Handshake on entry
+
+Every agent must execute a handshake when entering a project:
+
+```
+Step 1: Read MANIFEST.md   → System rules
+Step 2: Read SHARD.md      → Current state (≤80 lines)
+Step 3: Read BADGE-{id}.md → Your identity & permissions
+Step 4: Check inbox        → Unread messages
+Step 5: Check tasks        → Your active tasks
+Step 6: Output summary     → Then respond to user
+```
+
+This ensures no agent starts working without knowing the current context.
+
+<br/>
+
+## Quick start {#quick-start}
+
+### Option A: Setup wizard (recommended)
 
 ```bash
 npm i -g collab-cli
 
-# Single device
+# Single device — just works
 collab setup --devices 1 --project "My Project"
 
-# Multiple devices
+# Multi device — generates per-device instructions
 collab setup --devices 2 \
   --project "My Project" \
   --device-1 "DeviceA:codex-1@Codex" \
@@ -76,7 +224,7 @@ collab setup --devices 2 \
 ```
 
 The wizard will:
-1. Initialize `.shared/` directory
+1. Initialize `.shared/` directory with all required files
 2. Issue badges for all agents
 3. Generate per-device startup instructions
 4. Create `peers.yaml` with LAN config (multi-device only)
@@ -84,351 +232,256 @@ The wizard will:
 ### Option B: Manual setup
 
 ```bash
-# Step 1: Install
 npm i -g collab-cli
 
-# Step 2: Initialize in your project
-cd my-awesome-project
+# Initialize
+cd my-project
 collab init --project "My Project"
 
-# Step 3: Issue badges for agents
-collab badge issue claude-01 --role L4 --assigned-by user     # Claude = Chief Engineer
-collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = Contributor
-
-# Step 4: Try it out
-collab task create "Implement user login" --assignee claude-01 --priority P0
-collab inbox send --from claude-01 --to reasonix-01 --title "Review login module" --priority P1 --needs-reply
-collab handshake claude-01   # Claude reads everything automatically on entry
-```
-
-Run `collab status` to see the big picture:
-
-```
-📋 Collaboration Status — My Project
-──────────────────────────────────────────────────
-
-📝 SHARD (L0 Live Memory): 13/80 lines
-
-🪪 Badges (2):
-   claude-01: L4 (user)
-   reasonix-01: L2 (user)
-
-📋 Tasks: 1 total
-   IN_PROGRESS: 0 | ASSIGNED: 1
-
-📬 Inbox: 1 unread
-   reasonix-01: 1 unread (P0:0 P1:1)
-
-🧠 Memory: L1 0 files, L2 Archive 0
-```
-
-<br/>
-
-## 🎯 Who is this for?
-
-| You are... | You get... |
-|:--|:--|
-| 🧑‍💻 **A developer using multiple AI coding tools** | All agents share the same project state — no more repeating context |
-| 🏗️ **An architect building an AI team** | Standardized role permissions, task dispatch, review workflow |
-| 🔬 **An AI agent researcher** | A reusable multi-agent collaboration protocol reference implementation |
-| 🤖 **An AI agent developer** | Plug your agent into any project via MCP plugin |
-
-<br/>
-
-## 📖 A Complete Real-World Walkthrough
-
-> **Scenario**: You're building an e-commerce platform. Claude Code writes the backend API, Reasonix does code review, and a scheduler agent runs nightly batch jobs.
-
-### Step 1: Initialize the project
-
-```bash
-collab init --project "E-Commerce Platform"
-```
-
-This creates a `.shared/` directory with all collaboration files.
-
-### Step 2: Issue badges
-
-```bash
-# Claude is Chief Engineer (L4) — full access
+# Issue badges
 collab badge issue claude-01 --role L4 --assigned-by user
+collab badge issue workbuddy-01 --role L2 --assigned-by user
 
-# WorkBuddy is Executor (L1) — can only write own tasks
-collab badge issue workbuddy-01 --role L1 --assigned-by user
-
-# Reasonix is Reviewer (L3) — can approve tasks
-collab badge issue reasonix-01 --role L3 --assigned-by user
-```
-
-### Step 3: Chief Engineer assigns tasks
-
-```bash
-# Claude (Chief Engineer) assigns a task to WorkBuddy
-collab task create "Product search optimization" \
-  --assignee workbuddy-01 \
-  --priority P1 \
-  --deadline "2026-06-09T09:30:00+08:00" \
-  --by claude-01
-
-# Claude assigns a task to itself
-collab task create "Payment module refactor" \
-  --assignee claude-01 \
-  --priority P0 \
-  --by user
-```
-
-### Step 4: Cross-agent communication
-
-```bash
-# WorkBuddy finishes the task and sends a review request to Claude
-collab inbox send \
-  --from workbuddy-01 \
-  --to claude-01 \
-  --title "Search optimization done, please review" \
-  --priority P1 \
-  --type review_request \
-  --body "Script at services/search.py, passed local tests" \
-  --task T-001 \
-  --needs-reply
-```
-
-### Step 5: Claude auto-detects on next startup
-
-When Claude Code opens the project, the handshake protocol runs automatically:
-
-```
-🤝 Handshake complete
-🪪 Badge: L4 Chief Engineer | 📬 Unread: 1 (P1) | 📋 Active tasks: 2
-⚠️ 1 P1 unread message needs attention: "Search optimization done, please review"
-```
-
-**No need to manually tell Claude "WorkBuddy sent you a message" — it already knows.**
-
-### Step 6: Review and approve
-
-```bash
-# Claude reviews, then updates task status
-collab task update T-001 REVIEW --by claude-01 --note "Code quality looks good"
-collab task update T-001 DONE --by user --note "User confirmed"
-
-# Reply to sender
-collab inbox send \
-  --from claude-01 \
-  --to workbuddy-01 \
-  --title "Review approved" \
-  --type response \
-  --body "Code quality is good, merged" \
-  --task T-001
-```
-
-<br/>
-
-## 🏗️ Architecture
-
-```
-your-project/
-├── .shared/                        ← Collaboration root
-│   ├── MANIFEST.md                    System declaration + role definitions
-│   ├── SHARD.md                       L0 Live Memory (required reading, ≤80 lines)
-│   ├── BADGE-claude-01.md             Claude's badge
-│   ├── BADGE-workbuddy-01.md          WorkBuddy's badge
-│   ├── inbox/
-│   │   ├── claude-01/                 Claude's inbox
-│   │   │   └── 001-review-request.md
-│   │   └── workbuddy-01/             WorkBuddy's inbox
-│   ├── tasks/
-│   │   ├── T-001-search-optimize.md   Task file (state machine + progress log)
-│   │   └── T-002-payment-refactor.md
-│   ├── memory/                        L1 Memory fragments (by topic, ≤50 lines each)
-│   │   ├── decisions.md
-│   │   ├── lessons.md
-│   │   └── architecture.md
-│   ├── archive/                       L2 Archive (by date, auto-compressed)
-│   └── conflicts/                     Conflict records (awaiting arbitration)
-│
-├── .claude/CLAUDE.md                ← Claude Code handshake instructions
-├── .reasonix/system.md              ← Reasonix handshake instructions
-└── reasonix.toml                    ← Reasonix MCP plugin config
-```
-
-<br/>
-
-## 🪪 Badge Permissions
-
-```
-L4 Chief Engineer ──┬── Full read/write + assign tasks + manage badges
-                    │
-L3 Reviewer ────────┤── Approve tasks + write SHARD + write memory
-                    │
-L2 Contributor ─────┤── Write memory + submit reviews
-                    │
-L1 Executor ────────┤── Write own tasks + write inbox
-                    │
-L0 Observer ────────┴── Read-only (cannot modify any files)
-```
-
-- Different sessions of the same agent can hold **different badges**
-- When no Chief Engineer exists, the first agent self-nominates, user confirms
-- Badges expire at session end
-
-<br/>
-
-## 🧠 Memory Decay Mechanism
-
-```
-                 Write time
-                   │
-                   ▼
-           ┌──────────────┐
-           │   SHARD.md   │  ← L0: Only "currently true" facts (≤80 lines)
-           └──────┬───────┘
-                  │
-        Exceeds 80 lines or task completed
-                  │
-                  ▼
-           ┌──────────────┐
-           │   memory/    │  ← L1: By topic (≤50 lines/file)
-           └──────┬───────┘
-                  │
-          Weekly or L1 exceeds limit
-                  │
-                  ▼
-           ┌──────────────┐
-           │   archive/   │  ← L2: Compressed by date (≤50 lines/day)
-           └──────────────┘
-```
-
-**Result**: New agents only need to read 80 lines to understand the full picture.
-
-<br/>
-
-## 🔌 Agent Integration Guide
-
-### Claude Code (one line)
-
-```bash
+# Set up agent instructions
 cat node_modules/collab-cli/src/templates/CLAUDE_PROTOCOL.md >> .claude/CLAUDE.md
-```
 
-Claude Code will automatically handshake on each startup: read SHARD → get badge → check inbox → review tasks.
-
-### Reasonix (three options)
-
-**Option A: MCP Plugin (recommended, strongest integration)**
-
-Add to `reasonix.toml`:
-
-```toml
-[[plugins]]
-name = "collab"
-type = "stdio"
-command = "collab"
-args = ["mcp"]
-```
-
-Reasonix gains 12 tools natively (`mcp__collab__inbox_check`, `mcp__collab__task_create`, etc.).
-
-**Option B: Custom Command**
-
-```bash
-mkdir -p .reasonix/commands
-cp node_modules/collab-cli/src/templates/reasonix-commands/collab.md .reasonix/commands/
-```
-
-Type `/collab handshake` to trigger handshake.
-
-**Option C: Protocol Injection**
-
-```bash
-mkdir -p .reasonix
-cp node_modules/collab-cli/src/templates/REASONIX_PROTOCOL.md .reasonix/system.md
-```
-
-### WorkBuddy / Cursor / Codex
-
-```bash
-# WorkBuddy
-cat node_modules/collab-cli/src/templates/AGENT_PROTOCOL.md >> .workbuddy/MEMORY.md
-
-# Cursor
-cat node_modules/collab-cli/src/templates/CURSOR_PROTOCOL.md >> .cursor/rules
-
-# Codex
-cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
+# Start collaborating
+collab task create "First task" --assignee claude-01 --priority P0
+collab inbox send --from claude-01 --to workbuddy-01 --title "Hello" --priority P1
 ```
 
 <br/>
 
-## 📬 Messaging System
+## Core concepts {#core-concepts}
 
-### Send a message
+### 🪪 Badge — Agent identity & permissions
 
-```bash
-collab inbox send \
-  --from claude-01 \
-  --to workbuddy-01 \
-  --title "URGENT: Fix payment timeout" \
-  --priority P0 \
-  --type task \
-  --body "Payment API not responding, orders stuck in pending state" \
-  --task T-003 \
-  --needs-reply
-```
+Each agent receives a badge when entering a project. The badge defines the agent's role, permissions, and scope.
 
-### Check unread
+| Level | Name | Can do | Cannot do |
+|:--|:--|:--|:--|
+| L0 | Observer | Read SHARD, memory | Write anything |
+| L1 | Executor | Write own tasks + inbox | Write SHARD, approve tasks |
+| L2 | Contributor | L1 + write memory + submit reviews | Approve tasks, manage badges |
+| L3 | Reviewer | L2 + approve tasks + write SHARD | Change other badges |
+| L4 | Chief Engineer | Everything | — |
 
-```bash
-$ collab inbox check workbuddy-01
+### 📬 Inbox — Structured messaging
 
-📬 Unread Messages:
+Agents communicate through structured messages with priority (P0-P3), type (task/review/approval/question), and optional response-required flag.
 
-| ID     | Priority | Type | From      | Title                  | Needs Reply |
-|--------|----------|------|-----------|------------------------|:-----------:|
-| MSG-001| P0       | task | claude-01 | URGENT: Fix payment    |     ✅      |
-```
+### 📋 Task — Lifecycle-managed work items
 
-### Message types
+Tasks follow a state machine: DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE. Only the assignee can change status. Completion requires Chief Engineer review + user confirmation.
 
-| Type | Use case |
-|:--|:--|
-| `task` | Assign a task |
-| `review_request` | Request code review |
-| `approval` | Approve or reject |
-| `question` | Ask a question |
-| `notification` | General notification |
-| `response` | Reply to a message |
+### 🧠 Memory — Three layers with auto-decay
+
+L0 SHARD (live, ≤80 lines) → L1 memory (fragments, ≤50 lines each) → L2 archive (compressed by date). Prevents memory bloat while preserving history.
+
+### 🤝 Handshake — Automatic context loading
+
+Every agent reads SHARD + badge + inbox + tasks on startup. No manual explanation needed.
 
 <br/>
 
-## 💓 Heartbeat Monitoring
+## Complete walkthrough {#complete-walkthrough}
 
-Persistent inbox monitoring for long-running agents:
+See the real-world walkthrough in the detailed READMEs:
+- [English walkthrough](./README.md#📖-a-complete-real-world-walkthrough)
+- [中文演练](./README.zh-CN.md#📖-一个完整的真实场景)
+
+<br/>
+
+## Agent integration {#agent-integration}
+
+| Agent | Integration method | File |
+|:--|:--|:--|
+| **Claude Code** | Append to `.claude/CLAUDE.md` | `CLAUDE_PROTOCOL.md` |
+| **Reasonix** | Copy to `.reasonix/system.md` or MCP plugin | `REASONIX_PROTOCOL.md` |
+| **WorkBuddy** | Append to `.workbuddy/memory/MEMORY.md` | `AGENT_PROTOCOL.md` |
+| **Cursor** | Merge into `.cursor/rules` | `CURSOR_PROTOCOL.md` |
+| **Codex** | Copy as `AGENTS.md` | `CODEX_PROTOCOL.md` |
+| **Any agent** | Place `AGENT_PROTOCOL.md` in project root | `AGENT_PROTOCOL.md` |
+
+See [templates/](./src/templates/) for all protocol files.
+
+<br/>
+
+## LAN Node (cross-device) {#lan-node}
+
+### How multi-device sync works
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      Multi-Device Architecture                    │
+│                                                                  │
+│  Device A                                    Device B            │
+│  ┌─────────────────┐                       ┌─────────────────┐  │
+│  │ collab node     │   UDP Broadcast       │ collab node     │  │
+│  │ HTTP :9527      │◄─────────────────────►│ HTTP :9527      │  │
+│  │ UDP  :9528      │   (auto-discovery)    │ UDP  :9528      │  │
+│  └────────┬────────┘                       └────────┬────────┘  │
+│           │                                         │           │
+│           │            SHARD sync (10s)              │           │
+│           │◄──────────── HTTP push ─────────────────►│           │
+│           │            Tasks sync (10s)              │           │
+│           │◄──────────── HTTP push ─────────────────►│           │
+│           │            Inbox (real-time)             │           │
+│           │◄──────────── HTTP push ─────────────────►│           │
+│           │                                         │           │
+│  ┌────────┴────────┐                       ┌────────┴────────┐  │
+│  │ .shared/        │                       │ .shared/        │  │
+│  │ SHARD.md ✅ sync│                       │ SHARD.md ✅ sync│  │
+│  │ tasks/ ✅ sync  │                       │ tasks/ ✅ sync  │  │
+│  │ inbox/a1 ❌ own │                       │ inbox/a2 ❌ own │  │
+│  │ memory/ ✅ sync │                       │ memory/ ✅ sync │  │
+│  └─────────────────┘                       └─────────────────┘  │
+│                                                                  │
+│  Codex-1                                   Codex-2              │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### What syncs and what doesn't
+
+| File | Synced? | Protocol | Strategy |
+|:--|:--:|:--|:--|
+| `SHARD.md` | ✅ | HTTP push every 10s | Version-based: newer version wins |
+| `tasks/` | ✅ | HTTP push every 10s | Status merge: more advanced status wins |
+| `memory/` | ✅ | HTTP push | Full replace |
+| `inbox/` | ❌ | — | Per-device by design (each device stores its own agent's messages) |
+| `MANIFEST.md` | — | Manual | Same on all devices (keep in sync via git) |
+| `BADGE-*.md` | — | Manual | Same on all devices |
+
+### LAN discovery protocol
+
+1. Each node broadcasts a UDP packet on port 9528 every 5 seconds
+2. The packet contains: `{ nodeId, agents: [...], apiPort }`
+3. Other nodes receive the broadcast and register the peer
+4. After 15 seconds without a heartbeat, the peer is marked as offline
+
+### First-time setup on a new device
+
+When a new device joins the network, it needs to pull existing data:
 
 ```bash
-# Persistent mode — check every 5 minutes
-collab heartbeat workbuddy-01
-
-# Single check — for scripts and CI
-collab heartbeat claude-01 --once
-# exit 0 = no messages
-# exit 2 = high priority messages (P0/P1)
-
-# Custom interval
-collab heartbeat claude-01 --interval 60  # every minute
+# On the new device
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
 ```
 
-Notification output (machine-parseable):
+This pulls the current SHARD.md and all tasks from the existing node.
 
-```
-[COLLAB_HEARTBEAT] {"type":"new_message","agentId":"claude-01","message":{"id":"MSG-001","priority":"P0",...}}
-🚨 New message: [P0] workbuddy-01 → URGENT: Fix payment timeout (needs reply)
+<br/>
+
+## CLI reference {#cli-reference}
+
+```bash
+# ── Setup (start here) ──
+collab setup                                    Guided setup wizard
+collab setup --devices 1 --project "Name"       Single device
+collab setup --devices 2 --device-1 "A:agent@Type" --device-2 "B:agent@Type"
+
+# ── System ──
+collab init --project "Name"                    Initialize .shared/
+collab status                                   Global status overview
+collab handshake <agent-id>                     Agent handshake check
+
+# ── Badges ──
+collab badge issue <id> --role <L0-L4>          Issue badge
+collab badge show <id>                          Show badge details
+collab badge list                               List all badges
+
+# ── Tasks ──
+collab task create <title> --assignee <id>      Create task
+collab task list [--status <s>] [--assignee <id>]
+collab task status <id>                         Task details
+collab task update <id> <status>                Update status
+
+# ── Inbox ──
+collab inbox check <id>                         Check unread messages
+collab inbox send --from <id> --to <id>         Send message
+collab inbox read <id> <msg-id>                 Read (mark as read)
+collab inbox done <id> <msg-id>                 Mark as done
+
+# ── Memory ──
+collab memory compact                           Auto-archive old entries
+collab memory stats                             Layer statistics
+
+# ── Heartbeat ──
+collab heartbeat <id>                           Start persistent monitoring
+collab heartbeat <id> --once                    Single check (exit 2 = P0/P1)
+
+# ── LAN Node ──
+collab node start [--agents <ids>] [--port N]   Start LAN node
+collab node pull --host <ip>                    Pull SHARD + tasks from peer
+collab node status                              Show node + discovered peers
+
+# ── MCP Server ──
+collab mcp                                      Start MCP server (stdio)
 ```
 
 <br/>
 
-## ⚡ Conflict Resolution
+## Architecture {#architecture}
 
-When two agents try to modify the same file simultaneously:
+### File structure
+
+```
+.shared/
+├── MANIFEST.md              System declaration + agent registry + role definitions
+├── SHARD.md                 L0 live memory (≤80 lines) — current state
+├── BADGE-{agent-id}.md      Per-agent badge (multi-badge, one per agent)
+├── peers.yaml               LAN node configuration (multi-device only)
+├── inbox/{agent-id}/        Message inbox (per-agent directory)
+│   └── 001-{topic}.md       Structured message (YAML frontmatter + Markdown body)
+├── tasks/T-xxx.md           Task file (state machine + progress log)
+├── memory/                  L1 memory fragments (by topic, ≤50 lines each)
+│   ├── decisions.md
+│   ├── lessons.md
+│   └── architecture.md
+├── archive/                 L2 archive (by date, auto-compressed)
+│   └── 2026-06-06.md
+└── conflicts/               Conflict records (awaiting Chief Engineer arbitration)
+    └── C-{timestamp}.md
+```
+
+### Module structure
+
+```
+collab-cli/
+├── bin/collab.js              CLI entry (20+ subcommands)
+├── src/
+│   ├── commands/              Command implementations
+│   │   ├── init.js            Initialization + migration
+│   │   ├── setup.js           Setup wizard
+│   │   ├── status.js          Global status
+│   │   ├── badge.js           Badge management
+│   │   ├── task.js            Task lifecycle
+│   │   ├── inbox.js           Messaging
+│   │   ├── memory.js          Memory decay
+│   │   ├── conflict.js        Conflict resolution
+│   │   ├── heartbeat.js       Heartbeat monitoring
+│   │   ├── node.js            LAN node command
+│   │   └── mcp-server.js      MCP server
+│   ├── core/                  Core modules
+│   │   ├── protocol.js        Handshake protocol + permissions
+│   │   ├── shard.js           SHARD management + auto-archive
+│   │   ├── fs-lock.js         Optimistic file locking
+│   │   └── yaml.js            YAML frontmatter engine
+│   ├── node/                  LAN node modules
+│   │   ├── discovery.js       UDP broadcast peer discovery
+│   │   ├── server.js          HTTP API server
+│   │   ├── router.js          Message routing (local/remote)
+│   │   └── sync.js            Cross-device SHARD/tasks sync
+│   ├── templates/             Protocol templates for each agent type
+│   └── utils/                 Timestamp + markdown utilities
+├── package.json               collab-cli
+├── README.md                  English
+├── README.zh-CN.md            Chinese
+├── README.ja.md               Japanese
+└── README.ko.md               Korean
+```
+
+### Conflict resolution (three layers)
 
 ```
 Layer 1: Prevention
@@ -446,140 +499,7 @@ Layer 3: Arbitration
 └─ If Chief Engineer can't decide → escalate to user
 ```
 
-<br/>
-
-## 🌐 LAN Node — Cross-Device Collaboration
-
-Agents on **different devices** can collaborate over the local network. Zero configuration — UDP auto-discovery.
-
-```
-Device A (192.168.1.100)              Device B (192.168.1.101)
-┌──────────────────────┐              ┌──────────────────────┐
-│ collab node start    │◄──HTTP──►   │ collab node start    │
-│ agents: codex-1      │  UDP auto   │ agents: codex-2      │
-│ port: 9527           │  discovery  │ port: 9527           │
-│                      │             │                      │
-│ .shared/             │◄─ sync ──►│ .shared/             │
-│  SHARD.md ✅         │  every 10s  │  SHARD.md ✅         │
-│  tasks/ ✅           │             │  tasks/ ✅           │
-│  inbox/codex-1/ ❌   │  (per-device│  inbox/codex-2/ ❌   │
-└──────────────────────┘             └──────────────────────┘
-```
-
-### What syncs across devices?
-
-| File | Synced? | How |
-|:--|:--:|:--|
-| `SHARD.md` | ✅ | Version-based push, newer wins |
-| `tasks/` | ✅ | Status-aware merge, advanced status wins |
-| `memory/` | ✅ | Full sync |
-| `inbox/` | ❌ | Per-device by design |
-| `MANIFEST.md` | ✅ | Same on all devices |
-| `BADGE-*.md` | ✅ | Same on all devices |
-
-### Quick start
-
-```bash
-# Use the setup wizard (recommended)
-collab setup --devices 2 \
-  --device-1 "DeviceA:codex-1@Codex" \
-  --device-2 "DeviceB:codex-2@Codex"
-
-# Device A — start node
-collab node start --agents codex-1
-
-# Device B — start node (use token from setup output)
-collab node start --agents codex-2 --token <token>
-
-# Device B — first time: pull existing data from Device A
-collab node pull --host 192.168.1.100 --port 9527 --token <token>
-
-# Now everything auto-syncs! Send messages across devices:
-collab inbox send --from codex-1 --to codex-2 --title "Review" --priority P1
-```
-
-### Commands
-
-```bash
-collab node start                     Start LAN node
-collab node start --agents a,b        Specify agents on this node
-collab node start --port 9527         Custom API port
-collab node start --token <token>     Use specific auth token
-collab node pull --host <ip>          Pull SHARD + tasks from remote peer
-collab node status                    Show node info and discovered peers
-```
-
-### API Endpoints
-
-| Endpoint | Method | Description |
-|:--|:--|:--|
-| `/api/status` | GET | Node status |
-| `/api/discovery` | GET | Peer info |
-| `/api/inbox/send` | POST | Send message |
-| `/api/inbox/check/:id` | GET | Check unread |
-| `/api/shard` | GET | Get SHARD.md |
-| `/api/tasks` | GET | List tasks |
-| `/api/sync/shard` | GET/POST | SHARD sync (pull/push) |
-| `/api/sync/tasks` | GET/POST | Tasks sync (pull/push) |
-
-<br/>
-
-## 📚 CLI Command Reference
-
-```bash
-# ── Setup ──
-collab setup                                    Interactive guided setup
-collab setup --devices 1 --project "My Project" # Single device
-collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
-
-# ── System ──
-collab init --project "Name"                    Initialize .shared/ directory
-collab status                                   Global status overview
-collab handshake <agent-id>                     Agent handshake check
-
-# ── Badges ──
-collab badge issue <id> --role <L0-L4>          Issue badge
-collab badge show <id>                          Show badge details
-collab badge list                               List all badges
-
-# ── Tasks ──
-collab task create <title> --assignee <id>      Create task
-collab task list [--status <s>] [--assignee <id>]  List/filter tasks
-collab task status <id>                         Task details
-collab task update <id> <status>                Update status
-
-# ── Inbox ──
-collab inbox check <id>                         Check unread messages
-collab inbox send --from <id> --to <id>         Send message
-collab inbox read <id> <msg-id>                 Read message (mark read)
-collab inbox done <id> <msg-id>                 Mark message done
-
-# ── Memory ──
-collab memory compact                           Auto-archive old entries
-collab memory stats                             Memory layer statistics
-collab memory archive <date>                    Archive by date
-
-# ── Conflicts ──
-collab conflict list                            List conflicts
-collab conflict resolve <id> --by <who>         Resolve conflict
-
-# ── Heartbeat ──
-collab heartbeat <id>                           Start persistent monitoring
-collab heartbeat <id> --once                    Single check (exit 2 = high priority)
-collab heartbeat <id> --interval 60             Custom interval (seconds)
-
-# ── LAN Node ──
-collab node start [--agents <ids>] [--port N]   Start LAN node
-collab node pull --host <ip> [--port N]         Pull SHARD + tasks from peer
-collab node status                              Show node + peers
-
-# ── MCP Server ──
-collab mcp                                      Start MCP server (stdio JSON-RPC)
-```
-
-<br/>
-
-## 🆚 How does it compare?
+### Comparison with alternatives
 
 | Feature | Manual coordination | Git branches | **collab-cli** |
 |:--|:--:|:--:|:--:|
@@ -588,72 +508,25 @@ collab mcp                                      Start MCP server (stdio JSON-RPC
 | Shared memory | Verbal | Commit messages | Structured 3-layer |
 | Task lifecycle | Verbal | PR/Issue | Built-in state machine |
 | New agent onboarding | Re-explain everything | Clone repo | Handshake auto-aligns |
+| Cross-device sync | N/A | git pull/push | Auto HTTP sync (10s) |
 | Token cost | Re-read everything | N/A | ≤80 lines live memory |
 
 <br/>
 
-## 🛠️ Development
+## Development {#development}
 
 ```bash
-# Clone the repo
 git clone https://github.com/yinsang0910-star/collab-cli.git
 cd collab-cli
-
-# Install dependencies
 npm install
-
-# Run tests (73 passing — unit + stress)
-npm test
-
-# Local development link
-npm link
+npm test          # 95 tests passing
+npm link          # Local development
 ```
 
-### Project structure
+## License
 
-```
-collab-cli/
-├── bin/collab.js              CLI entry (19 subcommands)
-├── src/
-│   ├── commands/              Command implementations
-│   │   ├── init.js            Initialization + migration
-│   │   ├── status.js          Global status
-│   │   ├── badge.js           Badge management
-│   │   ├── task.js            Task lifecycle
-│   │   ├── inbox.js           Messaging
-│   │   ├── memory.js          Memory decay
-│   │   ├── conflict.js        Conflict resolution
-│   │   ├── heartbeat.js       Heartbeat monitoring
-│   │   └── mcp-server.js      MCP server
-│   ├── core/                  Core modules
-│   │   ├── protocol.js        Handshake protocol + permissions
-│   │   ├── shard.js           SHARD management
-│   │   ├── fs-lock.js         Optimistic locking
-│   │   └── yaml.js            Frontmatter engine
-│   ├── templates/             Protocol templates
-│   │   ├── CLAUDE_PROTOCOL.md
-│   │   ├── REASONIX_PROTOCOL.md
-│   │   ├── CURSOR_PROTOCOL.md
-│   │   ├── CODEX_PROTOCOL.md
-│   │   └── AGENT_PROTOCOL.md
-│   └── utils/                 Utilities
-├── package.json               collab-cli@1.0.7
-├── README.md                  English
-├── README.zh-CN.md            Chinese
-├── README.ja.md               Japanese
-└── README.ko.md               Korean
-```
-
-<br/>
-
-## 📄 License
-
-MIT — use it however you want, including commercial use.
-
-<br/>
+MIT
 
 ---
 
-<p align="center">
-  If this project helped you, give it a ⭐!
-</p>
+<p align="center">If this project helped you, give it a ⭐!</p>

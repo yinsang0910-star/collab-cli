@@ -15,225 +15,144 @@
 <p align="center">
   <h1 align="center">🤝 collab-cli</h1>
   <p align="center"><strong>让多个 AI agent 像真实团队一样协作</strong></p>
-  <p align="center">一套通用协议 + CLI 工具，让 Claude Code、Reasonix、WorkBuddy、Cursor、Codex 等任何 AI agent 都能在同一个项目里分工合作、共享记忆、互相通信。</p>
+  <p align="center">一套通用协作协议 + CLI 工具，支持 Claude Code、Reasonix、Codex、WorkBuddy、Cursor 等任何 AI agent —— 单机或局域网多设备均可使用。</p>
 </p>
 
 <br/>
 
 ---
 
-## 🤔 你是否遇到过这些问题？
+## 目录
 
-| 问题 | 场景 |
-|:--|:--|
-| 😵 **信息不同步** | Claude Code 改了代码，WorkBuddy 不知道，重复实现了一遍 |
-| 🔄 **重复对话** | 每次开新会话都要重新解释项目背景、架构、之前的决策 |
-| 🚫 **权限混乱** | 执行 agent 不小心改了不该改的配置文件 |
-| 📨 **沟通断层** | 给另一个 agent 发了审查请求，但对方根本没看到 |
-| 📝 **记忆膨胀** | 共享文档越来越长，每次启动都要读几百行，浪费 token |
+- [这是什么？](#这是什么)
+- [两种模式：单机 vs 多设备](#两种模式)
+- [工作原理（协议与机制）](#工作原理)
+- [快速开始](#快速开始)
+- [核心概念](#核心概念)
+- [完整演练](#完整演练)
+- [Agent 接入](#agent-接入)
+- [LAN 节点（跨设备）](#lan-节点)
+- [CLI 命令参考](#cli-命令参考)
+- [架构](#架构)
+- [开发](#开发)
 
-**collab-cli 解决了所有这些问题。**
+---
+
+## 这是什么？ {#这是什么}
+
+**collab-cli 解决一个简单的问题：多个 AI agent 在同一个项目里工作时，彼此不知道对方在干什么。**
+
+没有 collab-cli 时：
+
+```
+Claude Code 会话 1  →  改了 API
+Claude Code 会话 2  →  不知道，又改了一遍
+WorkBuddy           →  跑夜间任务，没看到变更
+你（人类）           →  每次都要从头解释一遍
+```
+
+有 collab-cli 时：
+
+```
+Claude Code  →  写入 .shared/SHARD.md："API 已改为 v2"
+WorkBuddy    →  读 SHARD.md："哦，API 改了，我更新任务"
+你           →  什么都不用解释
+```
+
+**本质上就是一个共享文件夹（`.shared/`）+ 一套所有 agent 都遵守的协议。** 单机模式下不需要服务器、不需要网络。
 
 <br/>
 
-## ✨ 核心特性一览
+## 两种模式：单机 vs 多设备 {#两种模式}
+
+collab-cli 有**两种工作模式**。根据你的 agent 运行在哪里来选择：
+
+### 模式 1：单机（大多数用户）
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   🪪 工牌系统        给每个 agent 签发身份，L0-L4 五级权限       │
-│   🧠 三层记忆        活记忆(80行) + 片段(50行) + 归档(自动)     │
-│   📋 任务看板        创建→分配→执行→审查→完成，全生命周期       │
-│   📬 消息收件箱      P0-P3 优先级，关联任务，需回复标记          │
-│   🤝 握手协议        每次启动自动：读状态→领工牌→查消息→看任务   │
-│   💓 心跳监控        长驻 agent 的 inbox 自动巡检               │
-│   ⚡ 冲突仲裁        乐观锁 + 自动检测 + 总工裁定               │
-│   🔌 MCP 服务器      插件化集成，12 个结构化工具                 │
-│   🌐 LAN 节点        跨设备局域网协作                           │
-│   🔄 自动同步        SHARD + tasks 每 10 秒同步                 │
-│   🚀 安装向导        单机/多机模式引导式初始化                   │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+你的电脑
+├── .shared/              ← 一个共享文件夹，所有 agent 读写这里
+│   ├── SHARD.md             当前项目状态（≤80行）
+│   ├── BADGE-claude-01.md   Claude 的身份和权限
+│   ├── BADGE-workbuddy-01   WorkBuddy 的身份和权限
+│   ├── inbox/               agent 之间的消息
+│   ├── tasks/               任务看板
+│   └── memory/              知识片段
+├── Claude Code           ← 读 .shared/
+├── WorkBuddy             ← 读 .shared/
+└── Codex                 ← 读 .shared/
 ```
+
+**什么时候用**：所有 agent 在同一台电脑上。这是最常见的场景。
+
+**怎么运作**：纯文件系统。agent 直接读写 `.shared/` 下的文件。零网络、零服务器、零配置。
+
+### 模式 2：多设备（局域网）
+
+```
+电脑 A (192.168.1.100)               电脑 B (192.168.1.101)
+├── .shared/                         ├── .shared/
+│   ├── SHARD.md  ←──── 同步 ────→  │   ├── SHARD.md
+│   ├── tasks/   ←──── 同步 ────→   │   ├── tasks/
+│   ├── inbox/codex-1/ (仅自己)     │   ├── inbox/codex-2/ (仅自己)
+│   └── BADGE-*.md                  │   └── BADGE-*.md
+├── collab node :9527  ←── HTTP ──→ ├── collab node :9527
+└── Codex-1                          └── Codex-2
+```
+
+**什么时候用**：你的 agent 在不同的电脑上，且在同一个 WiFi/局域网内。
+
+**怎么运作**：每台电脑运行一个 `collab node`（轻量 HTTP 服务器）。节点通过 UDP 广播自动发现彼此。SHARD.md 和 tasks 每 10 秒同步一次。inbox 消息实时推送。
+
+### 我该用哪种模式？
+
+| 你的场景 | 模式 | 命令 |
+|:--|:--|:--|
+| 所有 agent 在一台电脑上 | **单机** | `collab setup --devices 1` |
+| agent 在 2+ 台电脑上，同一局域网 | **多设备** | `collab setup --devices 2` |
+| agent 在不同网络（如家里和公司） | 暂不支持 | 用 git 同步作为替代方案 |
 
 <br/>
 
-## 🚀 30 秒快速体验
+## 工作原理（协议与机制） {#工作原理}
 
-```bash
-# 第 1 步：安装
-npm i -g collab-cli
+### 通信协议
 
-# 第 2 步：在你的项目里初始化
-cd my-awesome-project
-collab init --project "我的项目"
+collab-cli 使用**四种不同的协议**，根据场景自动选择：
 
-# 第 3 步：给 agent 签发工牌
-collab badge issue claude-01 --role L4 --assigned-by user     # Claude = 总工
-collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = 贡献者
+| 协议 | 端口 | 用途 | 使用场景 |
+|:--|:--|:--|:--|
+| **文件系统** | 无 | SHARD、tasks、badge、memory | 单机模式（始终使用） |
+| **UDP 广播** | 9528 | 节点自动发现 | 仅多设备模式 |
+| **HTTP REST** | 9527 | 消息路由、SHARD 同步、tasks 同步 | 仅多设备模式 |
+| **MCP (JSON-RPC)** | stdio | Reasonix/Claude Desktop 插件集成 | 可选 |
 
-# 第 4 步：模拟协作
-collab task create "实现用户登录" --assignee claude-01 --priority P0
-collab inbox send --from claude-01 --to reasonix-01 --title "请审查登录模块" --priority P1 --needs-reply
-collab handshake claude-01   # Claude 进入时自动读取一切
+### 核心原则：文件即协议
+
+整个系统建立在**带 YAML frontmatter 的纯 Markdown 文件**上。任何能读写文件的 agent 都能参与。不需要特殊 SDK，不需要 API 客户端，没有运行时依赖。
+
+```yaml
+---
+id: MSG-001
+from: claude-01
+to: workbuddy-01
+priority: P1
+status: unread
+---
+
+# 请审查登录模块
+
+代码在 src/auth/login.py
 ```
 
-运行 `collab status` 看全局：
+这就是一条消息的样子。它就是一个文件。任何文本编辑器都能读，任何 AI agent 都能解析。
+
+### 核心原则：基于角色的权限控制
+
+每个 agent 加入项目时获得一张**工牌**。工牌定义了 agent 能做什么、不能做什么：
 
 ```
-📋 协作体系状态 — 我的项目
-──────────────────────────────────────────────────
-
-📝 SHARD (L0 活记忆): 13/80 行
-
-🪪 工牌 (2 个):
-   claude-01: L4 (user)
-   reasonix-01: L2 (user)
-
-📋 任务: 1 总计
-   IN_PROGRESS: 0 | ASSIGNED: 1
-
-📬 Inbox: 1 条未读
-   reasonix-01: 1 未读 (P0:0 P1:1)
-
-🧠 记忆: L1 0 个文件, L2 归档 0 个
-```
-
-<br/>
-
-## 🎯 这是给谁用的？
-
-| 你是... | 你能得到... |
-|:--|:--|
-| 🧑‍💻 **同时用多个 AI 编程工具的开发者** | 所有 agent 共享同一份项目状态，不再重复对话 |
-| 🏗️ **搭建 AI 团队的架构师** | 标准化的角色权限、任务分发、审查流程 |
-| 🔬 **做 AI agent 研究的人** | 一套可复用的多 agent 协作协议参考实现 |
-| 🤖 **开发 AI agent 的人** | 通过 MCP 插件让你的 agent 即插即用地加入任何协作体系 |
-
-<br/>
-
-## 📖 一个完整的真实场景
-
-> **场景**：你正在开发一个电商平台，用 Claude Code 写后端 API，用 Reasonix 做代码审查，用一个定时任务 agent 跑夜间批处理。
-
-### 第 1 步：初始化项目
-
-```bash
-collab init --project "电商平台"
-```
-
-这会在项目下创建 `.shared/` 目录，包含所有协作文件。
-
-### 第 2 步：签发工牌
-
-```bash
-# Claude 是总工（L4），拥有全部权限
-collab badge issue claude-01 --role L4 --assigned-by user
-
-# WorkBuddy 是执行者（L1），只能写自己的任务
-collab badge issue workbuddy-01 --role L1 --assigned-by user
-
-# Reasonix 是审查者（L3），可以审批任务
-collab badge issue reasonix-01 --role L3 --assigned-by user
-```
-
-### 第 3 步：总工分配任务
-
-```bash
-# Claude（总工）给 WorkBuddy 分配任务
-collab task create "商品搜索优化" \
-  --assignee workbuddy-01 \
-  --priority P1 \
-  --deadline "2026-06-09T09:30:00+08:00" \
-  --by claude-01
-
-# Claude 给自己分配任务
-collab task create "支付模块重构" \
-  --assignee claude-01 \
-  --priority P0 \
-  --by user
-```
-
-### 第 4 步：跨 agent 通信
-
-```bash
-# WorkBuddy 完成任务后，发消息给 Claude 请求审查
-collab inbox send \
-  --from workbuddy-01 \
-  --to claude-01 \
-  --title "搜索优化脚本已完成，请审查" \
-  --priority P1 \
-  --type review_request \
-  --body "脚本位于 services/search.py，已通过本地测试" \
-  --task T-001 \
-  --needs-reply
-```
-
-### 第 5 步：Claude 下次启动时自动感知
-
-Claude Code 打开项目时，握手协议自动执行：
-
-```
-🤝 握手完成
-🪪 工牌: L4 总工 | 📬 未读: 1条(P1) | 📋 活跃任务: 2个
-⚠️ 有 1 条 P1 未读消息需优先处理: "搜索优化脚本已完成，请审查"
-```
-
-**不需要你手动告诉 Claude "WorkBuddy 给你发了消息"——它自己就知道。**
-
-### 第 6 步：审查通过
-
-```bash
-# Claude 审查后，更新任务状态
-collab task update T-001 REVIEW --by claude-01 --note "代码质量良好"
-collab task update T-001 DONE --by user --note "用户确认"
-
-# 回复发件人
-collab inbox send \
-  --from claude-01 \
-  --to workbuddy-01 \
-  --title "审查通过" \
-  --type response \
-  --body "代码质量良好，已合并" \
-  --task T-001
-```
-
-<br/>
-
-## 🏗️ 架构总览
-
-```
-你的项目/
-├── .shared/                        ← 协作体系根目录
-│   ├── MANIFEST.md                    系统声明 + 角色定义
-│   ├── SHARD.md                       L0 活记忆（每个 agent 必读，≤80行）
-│   ├── BADGE-claude-01.md             Claude 的工牌
-│   ├── BADGE-workbuddy-01.md          WorkBuddy 的工牌
-│   ├── inbox/
-│   │   ├── claude-01/                 Claude 的收件箱
-│   │   │   └── 001-审查请求.md
-│   │   └── workbuddy-01/             WorkBuddy 的收件箱
-│   ├── tasks/
-│   │   ├── T-001-搜索优化.md          任务文件（含状态机+进度日志）
-│   │   └── T-002-支付重构.md
-│   ├── memory/                        L1 记忆片段（按主题，≤50行/文件）
-│   │   ├── decisions.md               决策记录
-│   │   ├── lessons.md                 经验教训
-│   │   └── architecture.md            架构说明
-│   ├── archive/                       L2 归档（按日期，自动压缩）
-│   └── conflicts/                     冲突记录（等待仲裁）
-│
-├── .claude/CLAUDE.md                ← Claude Code 握手指令
-├── .reasonix/system.md              ← Reasonix 握手指令
-└── reasonix.toml                    ← Reasonix MCP 插件配置
-```
-
-<br/>
-
-## 🪪 工牌权限详解
-
-```
-L4 总工 ──────┬── 全部读写 + 分发任务 + 升降级 + 管理工牌
+L4 总工 ──────┬── 全部读写 + 分发任务 + 管理工牌
               │
 L3 审查者 ────┤── 审批任务 + 写 SHARD + 写记忆
               │
@@ -244,171 +163,307 @@ L1 执行者 ────┤── 写自己的任务 + 写 inbox
 L0 观察者 ────┴── 只读（不能改任何文件）
 ```
 
-- 同一 agent 不同会话可以持有**不同工牌**
-- 没有总工时，第一个进入的 agent 自荐，用户确认
-- 工牌在会话结束时自动失效
+同一 agent 的不同会话可以持有不同工牌。工牌在会话结束时自动失效。
+
+### 核心原则：三层记忆 + 自动衰减
+
+为防止记忆膨胀（每个 agent 读几百行），记忆分为三层：
+
+```
+L0  SHARD.md     ← "此刻为真的事实"（≤80行，每个 agent 必读）
+L1  memory/       ← "我们做过的决定"（按主题，每个 ≤50 行）
+L2  archive/       ← "以前发生的事"（按日期，只在需要追溯时查阅）
+```
+
+当 SHARD 超过 80 行时，旧条目自动移入 archive/。**新 agent 只需读 80 行就能了解全貌。**
+
+### 核心原则：任务状态机
+
+每个任务遵循严格的生命周期：
+
+```
+DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE
+                                  ↓
+                               REWORK → IN_PROGRESS
+```
+
+任务不能跳过 REVIEW。总工审查后，用户最终确认。
+
+### 核心原则：启动握手
+
+每个 agent 进入项目时必须执行握手：
+
+```
+Step 1: 读 MANIFEST.md   → 系统规则
+Step 2: 读 SHARD.md      → 当前状态（≤80行）
+Step 3: 读 BADGE-{id}.md → 你的身份和权限
+Step 4: 检查 inbox       → 未读消息
+Step 5: 检查 tasks       → 你的活跃任务
+Step 6: 输出摘要         → 然后响应用户
+```
+
+这确保没有 agent 在不了解当前上下文的情况下开始工作。
 
 <br/>
 
-## 🧠 记忆衰减机制
+## 快速开始 {#快速开始}
 
-```
-                 写入时
-                   │
-                   ▼
-           ┌──────────────┐
-           │   SHARD.md   │  ← L0: 只记录"此刻为真"的事实
-           │   (≤80 行)   │     每个 agent 必读
-           └──────┬───────┘
-                  │
-        超过 80 行 或 任务完成时
-                  │
-                  ▼
-           ┌──────────────┐
-           │   memory/    │  ← L1: 按主题拆分
-           │  (≤50行/文件)│     decisions / lessons / architecture
-           └──────┬───────┘
-                  │
-          每周 或 L1 超限时
-                  │
-                  ▼
-           ┌──────────────┐
-           │   archive/   │  ← L2: 按日期压缩
-           │  (≤50行/天)  │     只在需要追溯时查阅
-           └──────────────┘
-```
-
-**效果**：新 agent 进入时只需读 80 行就了解全貌，而不是 800 行。
-
-<br/>
-
-## 🔌 Agent 接入指南
-
-### Claude Code（一行命令）
+### 方式 A：安装向导（推荐）
 
 ```bash
+npm i -g collab-cli
+
+# 单机模式 — 直接用
+collab setup --devices 1 --project "我的项目"
+
+# 多设备模式 — 生成每台设备的启动指令
+collab setup --devices 2 \
+  --project "我的项目" \
+  --device-1 "设备A:codex-1@Codex" \
+  --device-2 "设备B:codex-2@Codex"
+```
+
+向导会：
+1. 初始化 `.shared/` 目录及所有必需文件
+2. 为所有 agent 签发工牌
+3. 生成每台设备的启动指令
+4. 创建 `peers.yaml` 局域网配置（仅多设备模式）
+
+### 方式 B：手动设置
+
+```bash
+npm i -g collab-cli
+
+# 初始化
+cd my-project
+collab init --project "我的项目"
+
+# 签发工牌
+collab badge issue claude-01 --role L4 --assigned-by user
+collab badge issue workbuddy-01 --role L2 --assigned-by user
+
+# 配置 agent 指令
 cat node_modules/collab-cli/src/templates/CLAUDE_PROTOCOL.md >> .claude/CLAUDE.md
-```
 
-Claude Code 每次启动自动执行握手，读 SHARD → 领工牌 → 查 inbox → 看任务。
-
-### Reasonix（三种方式）
-
-**方式 A：MCP 插件（推荐，最强集成）**
-
-在 `reasonix.toml` 中加：
-
-```toml
-[[plugins]]
-name = "collab"
-type = "stdio"
-command = "collab"
-args = ["mcp"]
-```
-
-Reasonix 自动获得 12 个工具（`mcp__collab__inbox_check`、`mcp__collab__task_create` 等），原生调用。
-
-**方式 B：自定义命令**
-
-```bash
-mkdir -p .reasonix/commands
-cp node_modules/collab-cli/src/templates/reasonix-commands/collab.md .reasonix/commands/
-```
-
-输入 `/collab handshake` 触发握手。
-
-**方式 C：协议注入**
-
-```bash
-mkdir -p .reasonix
-cp node_modules/collab-cli/src/templates/REASONIX_PROTOCOL.md .reasonix/system.md
-```
-
-### WorkBuddy / Cursor / Codex
-
-```bash
-# WorkBuddy
-cat node_modules/collab-cli/src/templates/AGENT_PROTOCOL.md >> .workbuddy/MEMORY.md
-
-# Cursor
-cat node_modules/collab-cli/src/templates/CURSOR_PROTOCOL.md >> .cursor/rules
-
-# Codex
-cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
+# 开始协作
+collab task create "第一个任务" --assignee claude-01 --priority P0
+collab inbox send --from claude-01 --to workbuddy-01 --title "你好" --priority P1
 ```
 
 <br/>
 
-## 📬 消息系统
+## 核心概念 {#核心概念}
 
-### 发送消息
+### 🪪 工牌 — Agent 身份与权限
 
-```bash
-collab inbox send \
-  --from claude-01 \
-  --to workbuddy-01 \
-  --title "紧急：修复支付超时" \
-  --priority P0 \
-  --type task \
-  --body "支付接口超时未返回结果，订单卡在待支付状态" \
-  --task T-003 \
-  --needs-reply
-```
+每个 agent 加入项目时获得一张工牌。工牌定义角色、权限和工作范围。
 
-### 检查未读
+### 📬 Inbox — 结构化消息
 
-```bash
-$ collab inbox check workbuddy-01
+agent 之间通过结构化消息通信，支持优先级（P0-P3）、类型（task/review/approval/question）和需回复标记。
 
-📬 未读消息:
+### 📋 任务 — 生命周期管理
 
-| ID     | 优先级 | 类型 | 来自      | 标题                  | 需回复 |
-|--------|--------|------|-----------|----------------------|:------:|
-| MSG-001| P0     | task | claude-01 | 紧急：修复支付超时    |   ✅   |
-```
+任务遵循状态机：DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE。只有负责人能改状态，完成需要总工审查 + 用户确认。
 
-### 消息类型
+### 🧠 记忆 — 三层自动衰减
 
-| 类型 | 用途 |
-|:--|:--|
-| `task` | 分配任务 |
-| `review_request` | 请求审查 |
-| `approval` | 审批通过/拒绝 |
-| `question` | 提问 |
-| `notification` | 通知 |
-| `response` | 回复 |
+L0 SHARD（活记忆，≤80行）→ L1 memory（片段，≤50行/文件）→ L2 archive（按日期压缩）。防止记忆膨胀，同时保留历史。
+
+### 🤝 握手 — 自动上下文加载
+
+每个 agent 启动时读 SHARD + 工牌 + inbox + 任务。不需要手动解释。
 
 <br/>
 
-## 💓 心跳监控
+## Agent 接入 {#agent-接入}
 
-为长时间运行的 agent 提供 inbox 巡检：
+| Agent | 接入方式 | 文件 |
+|:--|:--|:--|
+| **Claude Code** | 追加到 `.claude/CLAUDE.md` | `CLAUDE_PROTOCOL.md` |
+| **Reasonix** | 复制到 `.reasonix/system.md` 或 MCP 插件 | `REASONIX_PROTOCOL.md` |
+| **WorkBuddy** | 追加到 `.workbuddy/memory/MEMORY.md` | `AGENT_PROTOCOL.md` |
+| **Cursor** | 合并到 `.cursor/rules` | `CURSOR_PROTOCOL.md` |
+| **Codex** | 复制为 `AGENTS.md` | `CODEX_PROTOCOL.md` |
+| **任意 Agent** | 放在项目根目录 | `AGENT_PROTOCOL.md` |
+
+详见 [templates/](./src/templates/) 目录。
+
+<br/>
+
+## LAN 节点（跨设备） {#lan-节点}
+
+### 多设备同步原理
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                      多设备架构                                   │
+│                                                                  │
+│  设备 A                                     设备 B               │
+│  ┌─────────────────┐                       ┌─────────────────┐  │
+│  │ collab node     │   UDP 广播             │ collab node     │  │
+│  │ HTTP :9527      │◄─────────────────────►│ HTTP :9527      │  │
+│  │ UDP  :9528      │   （自动发现）          │ UDP  :9528      │  │
+│  └────────┬────────┘                       └────────┬────────┘  │
+│           │                                         │           │
+│           │            SHARD 同步 (10s)              │           │
+│           │◄──────────── HTTP 推送 ─────────────────►│           │
+│           │            Tasks 同步 (10s)              │           │
+│           │◄──────────── HTTP 推送 ─────────────────►│           │
+│           │            Inbox (实时)                  │           │
+│           │◄──────────── HTTP 推送 ─────────────────►│           │
+│           │                                         │           │
+│  ┌────────┴────────┐                       ┌────────┴────────┐  │
+│  │ .shared/        │                       │ .shared/        │  │
+│  │ SHARD.md ✅ 同步│                       │ SHARD.md ✅ 同步│  │
+│  │ tasks/ ✅ 同步  │                       │ tasks/ ✅ 同步  │  │
+│  │ inbox/a1 ❌ 独立│                       │ inbox/a2 ❌ 独立│  │
+│  └─────────────────┘                       └─────────────────┘  │
+│                                                                  │
+│  Codex-1                                   Codex-2              │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 哪些文件同步、哪些不同步
+
+| 文件 | 同步？ | 协议 | 策略 |
+|:--|:--:|:--|:--|
+| `SHARD.md` | ✅ | HTTP 推送，每 10 秒 | 版本号：新版本赢 |
+| `tasks/` | ✅ | HTTP 推送，每 10 秒 | 状态合并：更"前进"的状态赢 |
+| `memory/` | ✅ | HTTP 推送 | 完整替换 |
+| `inbox/` | ❌ | — | 按设备独立（每台设备只存自己 agent 的消息） |
+| `MANIFEST.md` | — | 手动 | 所有设备相同（通过 git 保持同步） |
+| `BADGE-*.md` | — | 手动 | 所有设备相同 |
+
+### LAN 发现协议
+
+1. 每个节点每 5 秒在端口 9528 广播一个 UDP 包
+2. 包内容：`{ nodeId, agents: [...], apiPort }`
+3. 其他节点收到广播后注册该 peer
+4. 超过 15 秒没有心跳，peer 标记为离线
+
+### 新设备首次加入
+
+新设备加入网络时需要拉取已有数据：
 
 ```bash
-# 长驻模式 — 每 5 分钟检查一次
-collab heartbeat workbuddy-01
-
-# 单次检查 — 适合脚本和 CI
-collab heartbeat claude-01 --once
-# exit 0 = 无消息
-# exit 2 = 有高优先级消息（P0/P1）
-
-# 自定义间隔
-collab heartbeat claude-01 --interval 60  # 每分钟
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
 ```
 
-通知输出格式（机器可解析）：
+这会从已有节点拉取当前的 SHARD.md 和所有 tasks。
 
-```
-[COLLAB_HEARTBEAT] {"type":"new_message","agentId":"claude-01","message":{"id":"MSG-001","priority":"P0",...}}
-🚨 新消息: [P0] workbuddy-01 → 紧急：修复支付超时 (需回复)
+<br/>
+
+## CLI 命令参考 {#cli-命令参考}
+
+```bash
+# ── 安装向导（从这里开始）──
+collab setup                                    引导式初始化
+collab setup --devices 1 --project "名称"       单机模式
+collab setup --devices 2 --device-1 "A:agent@Type" --device-2 "B:agent@Type"
+
+# ── 系统 ──
+collab init --project "名称"                    初始化 .shared/
+collab status                                   全局状态概览
+collab handshake <agent-id>                     Agent 握手检查
+
+# ── 工牌 ──
+collab badge issue <id> --role <L0-L4>          签发工牌
+collab badge show <id>                          查看工牌详情
+collab badge list                               列出所有工牌
+
+# ── 任务 ──
+collab task create <标题> --assignee <id>       创建任务
+collab task list [--status <s>] [--assignee <id>]
+collab task status <id>                         任务详情
+collab task update <id> <状态>                  更新状态
+
+# ── 消息 ──
+collab inbox check <id>                         检查未读消息
+collab inbox send --from <id> --to <id>         发送消息
+collab inbox read <id> <msg-id>                 阅读（标记已读）
+collab inbox done <id> <msg-id>                 标记完成
+
+# ── 记忆 ──
+collab memory compact                           自动归档旧条目
+collab memory stats                             记忆层级统计
+
+# ── 心跳 ──
+collab heartbeat <id>                           启动持久监控
+collab heartbeat <id> --once                    单次检查（exit 2 = 有 P0/P1）
+
+# ── LAN 节点 ──
+collab node start [--agents <ids>] [--port N]   启动 LAN 节点
+collab node pull --host <ip>                    从远程节点拉取 SHARD + tasks
+collab node status                              查看节点和已发现的 peer
+
+# ── MCP 服务器 ──
+collab mcp                                      启动 MCP 服务器（stdio）
 ```
 
 <br/>
 
-## ⚡ 冲突仲裁
+## 架构 {#架构}
 
-当两个 agent 同时修改同一个文件时：
+### 文件结构
+
+```
+.shared/
+├── MANIFEST.md              系统声明 + agent 注册表 + 角色定义
+├── SHARD.md                 L0 活记忆（≤80行）——当前状态
+├── BADGE-{agent-id}.md      每个 agent 的工牌（多 badge 并行）
+├── peers.yaml               LAN 节点配置（仅多设备模式）
+├── inbox/{agent-id}/        消息收件箱（按 agent 分目录）
+│   └── 001-{主题}.md        结构化消息（YAML frontmatter + Markdown body）
+├── tasks/T-xxx.md           任务文件（状态机 + 进度日志）
+├── memory/                  L1 记忆片段（按主题，每个≤50行）
+│   ├── decisions.md         决策记录
+│   ├── lessons.md           经验教训
+│   └── architecture.md      架构说明
+├── archive/                 L2 归档（按日期，自动压缩）
+│   └── 2026-06-06.md
+└── conflicts/               冲突记录（等待总工仲裁）
+    └── C-{timestamp}.md
+```
+
+### 模块结构
+
+```
+collab-cli/
+├── bin/collab.js              CLI 入口（20+ 子命令）
+├── src/
+│   ├── commands/              命令实现
+│   │   ├── init.js            初始化 + 迁移
+│   │   ├── setup.js           安装向导
+│   │   ├── status.js          全局状态
+│   │   ├── badge.js           工牌管理
+│   │   ├── task.js            任务生命周期
+│   │   ├── inbox.js           消息收发
+│   │   ├── memory.js          记忆衰减
+│   │   ├── conflict.js        冲突仲裁
+│   │   ├── heartbeat.js       心跳监控
+│   │   ├── node.js            LAN 节点命令
+│   │   └── mcp-server.js      MCP 服务器
+│   ├── core/                  核心模块
+│   │   ├── protocol.js        握手协议 + 权限
+│   │   ├── shard.js           SHARD 管理 + 自动归档
+│   │   ├── fs-lock.js         乐观文件锁
+│   │   └── yaml.js            YAML frontmatter 引擎
+│   ├── node/                  LAN 节点模块
+│   │   ├── discovery.js       UDP 广播节点发现
+│   │   ├── server.js          HTTP API 服务器
+│   │   ├── router.js          消息路由（本地/远程）
+│   │   └── sync.js            跨设备 SHARD/tasks 同步
+│   ├── templates/             各 agent 类型的协议模板
+│   └── utils/                 时间戳 + markdown 工具
+├── package.json
+├── README.md                  英文
+├── README.zh-CN.md            中文
+├── README.ja.md               日文
+└── README.ko.md               韩文
+```
+
+### 冲突仲裁（三层防护）
 
 ```
 第 1 层：预防
@@ -426,33 +481,7 @@ collab heartbeat claude-01 --interval 60  # 每分钟
 └─ 总工无法裁定 → 上报用户
 ```
 
-<br/>
-
-## 🌐 LAN 节点 — 跨设备协作
-
-不同设备上的 agent 可以通过局域网协作。UDP 自动发现，零配置。
-
-| 文件 | 同步？ | 方式 |
-|:--|:--:|:--|
-| `SHARD.md` | ✅ | 版本号推送，新版本赢 |
-| `tasks/` | ✅ | 状态机合并，更"前进"的状态赢 |
-| `inbox/` | ❌ | 每台设备独立 |
-
-```bash
-# 安装向导
-collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
-
-# 设备 A
-collab node start --agents codex-1
-
-# 设备 B
-collab node start --agents codex-2 --token <token>
-collab node pull --host 192.168.1.100 --port 9527 --token <token>
-```
-
-<br/>
-
-## 🆚 和其他方案的对比
+### 与其他方案的对比
 
 | 特性 | 手动协调 | Git 分支 | **collab-cli** |
 |:--|:--:|:--:|:--:|
@@ -461,73 +490,25 @@ collab node pull --host 192.168.1.100 --port 9527 --token <token>
 | 共享记忆 | 口头描述 | commit message | 结构化三层记忆 |
 | 任务生命周期 | 口头分配 | PR/Issue | 内置状态机 |
 | 新 agent 加入成本 | 重新解释一切 | clone 仓库 | 握手协议自动对齐 |
-| 跨 agent 类型 | 需要适配 | 通用 | 通用（纯文件协议） |
+| 跨设备同步 | N/A | git pull/push | 自动 HTTP 同步（10s） |
 | Token 消耗 | 每次重读全部 | N/A | ≤80 行活记忆 |
 
 <br/>
 
-## 🛠️ 开发
+## 开发 {#开发}
 
 ```bash
-# 克隆仓库
 git clone https://github.com/yinsang0910-star/collab-cli.git
 cd collab-cli
-
-# 安装依赖
 npm install
-
-# 运行测试（64 个，全部通过）
-npm test
-
-# 本地开发链接
-npm link
+npm test          # 95 个测试全部通过
+npm link          # 本地开发
 ```
 
-### 项目结构
+## 许可证
 
-```
-collab-cli/
-├── bin/collab.js              CLI 入口（19 个子命令）
-├── src/
-│   ├── commands/              命令实现
-│   │   ├── init.js            初始化 + 迁移
-│   │   ├── status.js          全局状态
-│   │   ├── badge.js           工牌管理
-│   │   ├── task.js            任务生命周期
-│   │   ├── inbox.js           消息收发
-│   │   ├── memory.js          记忆衰减
-│   │   ├── conflict.js        冲突仲裁
-│   │   ├── heartbeat.js       心跳监控
-│   │   └── mcp-server.js      MCP 服务器
-│   ├── core/                  核心模块
-│   │   ├── protocol.js        握手协议 + 权限
-│   │   ├── shard.js           SHARD 管理
-│   │   ├── fs-lock.js         乐观锁
-│   │   └── yaml.js            Frontmatter 引擎
-│   ├── templates/             协议模板
-│   │   ├── CLAUDE_PROTOCOL.md
-│   │   ├── REASONIX_PROTOCOL.md
-│   │   ├── CURSOR_PROTOCOL.md
-│   │   ├── CODEX_PROTOCOL.md
-│   │   └── AGENT_PROTOCOL.md
-│   └── utils/                 工具函数
-├── package.json               collab-cli@1.0.5
-├── README.md                  英文
-├── README.zh-CN.md            中文
-├── README.ja.md               日文
-└── README.ko.md               韩文
-```
-
-<br/>
-
-## 📄 License
-
-MIT — 随便用，商用也行。
-
-<br/>
+MIT
 
 ---
 
-<p align="center">
-  如果这个项目对你有帮助，给个 ⭐ 吧！
-</p>
+<p align="center">如果这个项目对你有帮助，给个 ⭐ 吧！</p>
