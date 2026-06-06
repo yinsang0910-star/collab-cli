@@ -267,8 +267,21 @@ function cmdBadge() {
       }
       break;
     }
+    case 'check': {
+      const agentId = args[2];
+      const operation = args[3];
+      if (!agentId || !operation) {
+        console.error('用法: collab badge check <agent-id> <operation>');
+        console.error('可用操作: write_shard, review_tasks, write_memory, manage_badges, manage_conflicts');
+        process.exit(1);
+      }
+      const result = badgeCmd.check(sharedDir, agentId, operation);
+      console.log(badgeCmd.formatCheckResult(result));
+      if (!result.allowed) process.exit(1);
+      break;
+    }
     default:
-      console.error('用法: collab badge <issue|show|list>');
+      console.error('用法: collab badge <issue|show|list|check>');
       process.exit(1);
   }
 }
