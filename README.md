@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/npm/dm/collab-cli?color=3fb950&labelColor=161b22" alt="downloads"/>
   <img src="https://img.shields.io/github/stars/yinsang0910-star/collab-cli?color=dbab09&labelColor=161b22&logo=github" alt="stars"/>
   <img src="https://img.shields.io/npm/l/collab-cli?color=8b949e&labelColor=161b22" alt="license"/>
-  <img src="https://img.shields.io/badge/tests-73%20passing-brightgreen?labelColor=161b22" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-90%20passing-brightgreen?labelColor=161b22" alt="tests"/>
 </p>
 
 <br/>
@@ -49,6 +49,7 @@
 │   💓 Heartbeat          Persistent inbox monitoring             │
 │   ⚡ Conflict Resolution Optimistic lock + auto-detect + arb   │
 │   🔌 MCP Server         Plugin integration, 12 structured tools│
+│   🌐 LAN Node           Cross-device collaboration over LAN    │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -419,6 +420,53 @@ Layer 3: Arbitration
 ├─ Chief Engineer resolves within 24h
 └─ If Chief Engineer can't decide → escalate to user
 ```
+
+<br/>
+
+## 🌐 LAN Node — Cross-Device Collaboration
+
+Agents on **different devices** can collaborate over the local network. Zero configuration — UDP auto-discovery.
+
+```
+Device A (192.168.1.100)              Device B (192.168.1.101)
+┌──────────────────────┐              ┌──────────────────────┐
+│ collab node start    │◄──HTTP──►   │ collab node start    │
+│ agents: claude-01    │  UDP auto   │ agents: workbuddy-01 │
+│ port: 9527           │  discovery  │ port: 9527           │
+└──────────────────────┘              └──────────────────────┘
+```
+
+### Usage
+
+```bash
+# Device A (Claude Code machine)
+collab node start --agents claude-01
+
+# Device B (WorkBuddy machine)
+collab node start --agents workbuddy-01
+
+# Now send messages across devices — automatic routing!
+collab inbox send --from claude-01 --to workbuddy-01 \
+  --title "Review request" --priority P1
+```
+
+### How it works
+
+1. **UDP Broadcast** (port 9528): Nodes announce themselves every 5 seconds
+2. **Auto Discovery**: Nodes find each other on the LAN automatically
+3. **Smart Routing**: Messages route to local files or remote HTTP API
+4. **Token Auth**: Random token per node for security
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|:--|:--|:--|
+| `/api/status` | GET | Node status |
+| `/api/discovery` | GET | Peer info |
+| `/api/inbox/send` | POST | Send message |
+| `/api/inbox/check/:id` | GET | Check unread |
+| `/api/shard` | GET | Get SHARD.md |
+| `/api/tasks` | GET | List tasks |
 
 <br/>
 
