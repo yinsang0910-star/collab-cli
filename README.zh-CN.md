@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/npm/dm/collab-cli?color=3fb950&labelColor=161b22" alt="downloads"/>
   <img src="https://img.shields.io/github/stars/yinsang0910-star/collab-cli?color=dbab09&labelColor=161b22&logo=github" alt="stars"/>
   <img src="https://img.shields.io/npm/l/collab-cli?color=8b949e&labelColor=161b22" alt="license"/>
-  <img src="https://img.shields.io/badge/tests-90%20passing-brightgreen?labelColor=161b22" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-95%20passing-brightgreen?labelColor=161b22" alt="tests"/>
 </p>
 
 <br/>
