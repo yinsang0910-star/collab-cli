@@ -37,6 +37,7 @@ import * as memoryCmd from '../src/commands/memory.js';
 import * as conflictCmd from '../src/commands/conflict.js';
 import * as heartbeatCmd from '../src/commands/heartbeat.js';
 import * as nodeCmd from '../src/commands/node.js';
+import * as setupCmd from '../src/commands/setup.js';
 import { handshake } from '../src/core/protocol.js';
 
 // ── 参数解析 ──
@@ -77,6 +78,9 @@ try {
   switch (command) {
     case 'init':
       cmdInit();
+      break;
+    case 'setup':
+      cmdSetup();
       break;
     case 'status':
       cmdStatus();
@@ -165,7 +169,65 @@ function cmdInit() {
   console.log('  1. 编辑 .shared/MANIFEST.md，注册你的 agent');
   console.log('  2. 运行 collab badge issue <agent-id> --role L4 为总工签发工牌');
   console.log('  3. 将 src/templates/AGENT_PROTOCOL.md 内容复制到 agent 指令文件');
+  console.log('  💡 或者直接运行 collab setup 进入交互式引导');
   console.log('');
+}
+
+function cmdSetup() {
+  const sharedDir = getSharedDir();
+
+  // 解析命令行参数（非交互模式）
+  const devicesFlag = getFlag('devices', '1');
+  const projectFlag = getFlag('project', path.basename(process.cwd()));
+  const agentsFlag = getFlag('agents');
+
+  const deviceCount = parseInt(devicesFlag);
+
+  // 构建答案
+  const answers = {
+    project: projectFlag,
+    devices: deviceCount,
+  };
+
+  if (deviceCount === 1) {
+    // 单机模式
+    const agentDefs = agentsFlag
+      ? agentsFlag.split(',').map((a, i) => {
+          const [id, type] = a.split(':');
+          return { id: id.trim(), type: type?.trim() || 'Agent', role: i === 0 ? 'L4' : 'L2' };
+        })
+      : [{ id: 'claude-01', type: 'Claude Code', role: 'L4' }];
+
+    answers.agents = agentDefs;
+  } else {
+    // 多机模式
+    const devicesList = [];
+    for (let i = 0; i < deviceCount; i++) {
+      const deviceFlag = getFlag(`device-${i + 1}`);
+      if (deviceFlag) {
+        const [name, agentSpec] = deviceFlag.split(':');
+        const agentParts = agentSpec.split(',');
+        const agents = agentParts.map((a, j) => {
+          const [id, type] = a.split('@');
+          return { id: id.trim(), type: type?.trim() || 'Agent', role: i === 0 && j === 0 ? 'L4' : 'L2' };
+        });
+        devicesList.push({ name: name.trim(), agents });
+      }
+    }
+
+    if (devicesList.length === 0) {
+      // 默认值
+      answers.devices_list = [
+        { name: '设备A', agents: [{ id: 'codex-1', type: 'Codex', role: 'L4' }] },
+        { name: '设备B', agents: [{ id: 'codex-2', type: 'Codex', role: 'L2' }] },
+      ];
+    } else {
+      answers.devices_list = devicesList;
+    }
+  }
+
+  const result = setupCmd.setup(sharedDir, answers);
+  console.log(setupCmd.formatSetupResult(result));
 }
 
 function cmdStatus() {
@@ -555,6 +617,7 @@ collab — 多智能体协作任务体系 CLI
 用法: collab <command> [subcommand] [options]
 
 命令:
+  setup                          交互式引导（推荐新手使用）
   init                           初始化协作体系
   status                         查看全局状态
   handshake <agent-id>           Agent 启动握手
