@@ -49,6 +49,9 @@
 │   💓 心跳监控        长驻 agent 的 inbox 自动巡检               │
 │   ⚡ 冲突仲裁        乐观锁 + 自动检测 + 总工裁定               │
 │   🔌 MCP 服务器      插件化集成，12 个结构化工具                 │
+│   🌐 LAN 节点        跨设备局域网协作                           │
+│   🔄 自动同步        SHARD + tasks 每 10 秒同步                 │
+│   🚀 安装向导        单机/多机模式引导式初始化                   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -421,6 +424,30 @@ collab heartbeat claude-01 --interval 60  # 每分钟
 ├─ 冲突写入 conflicts/C-{timestamp}.md
 ├─ 总工 24h 内裁定
 └─ 总工无法裁定 → 上报用户
+```
+
+<br/>
+
+## 🌐 LAN 节点 — 跨设备协作
+
+不同设备上的 agent 可以通过局域网协作。UDP 自动发现，零配置。
+
+| 文件 | 同步？ | 方式 |
+|:--|:--:|:--|
+| `SHARD.md` | ✅ | 版本号推送，新版本赢 |
+| `tasks/` | ✅ | 状态机合并，更"前进"的状态赢 |
+| `inbox/` | ❌ | 每台设备独立 |
+
+```bash
+# 安装向导
+collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
+
+# 设备 A
+collab node start --agents codex-1
+
+# 设备 B
+collab node start --agents codex-2 --token <token>
+collab node pull --host 192.168.1.100 --port 9527 --token <token>
 ```
 
 <br/>
