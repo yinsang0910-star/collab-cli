@@ -60,6 +60,13 @@ export function handshake(sharedDir, agentId) {
     chiefEngineer: manifest.data.chief_engineer || 'unassigned',
   };
 
+  // 检查 agent 是否已注册到 MANIFEST
+  const registeredAgents = parseAgentTable(manifest.content);
+  const isRegistered = registeredAgents.some(a => a.id === agentId);
+  if (!isRegistered) {
+    report.actions.push(`⚠️ Agent ${agentId} 未在 MANIFEST.md 注册。将作为 L0 观察者加入。`);
+  }
+
   // Step 2: 读 SHARD.md
   const shardPath = path.join(sharedDir, 'SHARD.md');
   if (fs.existsSync(shardPath)) {

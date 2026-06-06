@@ -133,8 +133,8 @@ export class SyncManager {
     const tasks = taskCmd.list(this.sharedDir);
     if (tasks.length === 0) return null;
 
-    // 简单 hash 检测变化
-    const taskHash = tasks.map(t => `${t.id}:${t.status}`).join('|');
+    // 完整 hash 检测变化（status + assignee + priority）
+    const taskHash = tasks.map(t => `${t.id}:${t.status}:${t.assignee}:${t.priority}`).join('|');
     if (taskHash === this.lastTaskHash) return null;
     this.lastTaskHash = taskHash;
 

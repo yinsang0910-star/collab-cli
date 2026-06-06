@@ -102,16 +102,19 @@ export function archive(sharedDir, date, content) {
   }
 
   const archivePath = path.join(archiveDir, `${date}.md`);
+  const tmpPath = archivePath + '.tmp';
 
-  if (fs.existsSync(archivePath)) {
-    // 追加到现有归档
-    const existing = fs.readFileSync(archivePath, 'utf-8');
-    fs.writeFileSync(archivePath, existing + '\n' + content, 'utf-8');
-  } else {
-    // 创建新归档
-    const header = `---\ndate: ${date}\narchived_at: ${now()}\n---\n\n`;
-    fs.writeFileSync(archivePath, header + `# 归档 ${date}\n\n${content}`, 'utf-8');
+  let existing = '';
+  try {
+    existing = fs.readFileSync(archivePath, 'utf-8');
+  } catch (e) {
+    // 文件不存在，创建新的
+    existing = `---\ndate: ${date}\narchived_at: ${now()}\n---\n\n# 归档 ${date}\n\n`;
   }
+
+  // 原子写入（写临时文件 → rename）
+  fs.writeFileSync(tmpPath, existing + '\n' + content + '\n', 'utf-8');
+  fs.renameSync(tmpPath, archivePath);
 
   return { success: true, path: archivePath };
 }

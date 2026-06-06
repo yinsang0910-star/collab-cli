@@ -250,7 +250,10 @@ export class CollabServer {
     const shardPath = `${this.sharedDir}/SHARD.md`;
     const current = yaml.safeRead(shardPath);
 
-    if (body.version && current.data.version && body.version <= current.data.version) {
+    const remoteVersion = Number(body.version) || 0;
+    const localVersion = Number(current.data.version) || 0;
+
+    if (remoteVersion > 0 && localVersion > 0 && remoteVersion <= localVersion) {
       this._json(res, 409, {
         error: 'Version conflict',
         currentVersion: current.data.version,

@@ -124,8 +124,17 @@ export class ShardManager {
       return { archived: 0, message: '没有需要归档的旧记录' };
     }
 
+    // 先拿锁，再写归档（防止锁失败时数据重复）
+    const lockResult = this.lock.acquire(agentId);
+    if (!lockResult.acquired) {
+      return { archived: 0, error: '锁定失败' };
+    }
+
+    // 重新读取最新数据（避免使用过时的 data 对象）
+    const fresh = this.lock.read();
+
     // 写入归档
-    this._writeArchive(toArchive);
+    const archivePaths = this._writeArchive(toArchive);
 
     // 重建 SHARD（移除已归档行）
     const tz = getTimezoneOffset();
@@ -165,11 +174,7 @@ export class ShardManager {
       }
     }
 
-    const lockResult = this.lock.acquire(agentId);
-    if (!lockResult.acquired) {
-      return { archived: 0, error: '锁定失败' };
-    }
-    this.lock.release(data, newLines.join('\n'), agentId);
+    this.lock.release(fresh.data, newLines.join('\n'), agentId);
 
     return {
       archived: toArchive.length,
@@ -208,6 +213,8 @@ export class ShardManager {
       fs.mkdirSync(archiveDir, { recursive: true });
     }
 
+    const writtenPaths = [];
+
     // 按日期分组
     const byDate = {};
     for (const { date, line } of entries) {
@@ -230,6 +237,9 @@ export class ShardManager {
       ].join('\n');
 
       fs.writeFileSync(archivePath, existing + append, 'utf-8');
+      writtenPaths.push(archivePath);
     }
+
+    return writtenPaths;
   }
 }
