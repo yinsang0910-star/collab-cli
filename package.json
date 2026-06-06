@@ -1,0 +1,27 @@
+{
+  "name": "collab-cli",
+  "version": "1.0.4",
+  "description": "Multi-agent collaboration protocol CLI — 多智能体协作任务体系",
+  "type": "module",
+  "bin": {
+    "collab": "bin/collab.js"
+  },
+  "files": [
+    "bin/",
+    "src/commands/!(*.test).js",
+    "src/core/!(*.test).js",
+    "src/utils/!(*.test).js",
+    "src/templates/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test src/**/*.test.js"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
