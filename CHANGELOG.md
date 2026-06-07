@@ -2,6 +2,29 @@
 
 All notable changes to collab-cli will be documented in this file.
 
+## [1.4.0] - 2026-06-06
+
+### Added
+
+- **Agent-to-Agent Commands** — Agents can send executable commands to each other without user intervention:
+  - `collab cmd send --from A --to B --type command --instruction "做X"` — Send command
+  - `collab cmd list --to <id>` — List pending commands for an agent
+  - `collab cmd exec --agent <id>` — Auto-execute pending commands
+  - `collab cmd status <cmd-id>` — View command details
+  - Command types: `command`, `review`, `approve`, `reject`, `notify`, `delegate`
+  - Status machine: `pending` → `executing` → `completed`/`failed`
+  - Auto-execution on agent startup (P0 commands require user confirmation)
+  - Auto-notifies sender of execution results
+- **Self-Review Framework** — Agents review their own work before submitting to user:
+  - `collab review create --task T-xxx` — Create multi-dimensional review
+  - `collab review self T-xxx --agent id` — Auto self-check (completeness + self_check)
+  - `collab review submit <id> <check> --passed true --score 85` — Submit check result
+  - `collab review status <id>` — View review status
+  - Review pipeline: configurable checks (code_quality, test_coverage, documentation, completeness)
+  - Auto-assigns L3+ reviewers when available
+  - Self-review mode for P2+ tasks (no external reviewer needed)
+- 14 new tests (109 total)
+
 ## [1.3.0] - 2026-06-06
 
 ### Added
