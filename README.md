@@ -29,6 +29,8 @@
 - [How it works (protocols & principles)](#how-it-works)
 - [Quick start](#quick-start)
 - [Core concepts](#core-concepts)
+- [Agent commands (no user needed)](#agent-commands)
+- [Self-review (auto quality check)](#self-review)
 - [Complete walkthrough](#complete-walkthrough)
 - [Agent integration](#agent-integration)
 - [LAN Node (cross-device)](#lan-node)
@@ -284,6 +286,113 @@ Every agent reads SHARD + badge + inbox + tasks on startup. No manual explanatio
 
 <br/>
 
+## Agent commands — No user needed {#agent-commands}
+
+**The old way**: User tells Agent A → Agent A sends inbox message → User opens Agent B → Agent B reads and executes.
+
+**The new way**: Agent A sends a command → Agent B auto-executes → Result sent back to A.
+
+```
+Agent A                                    Agent B
+   │                                          │
+   │  collab cmd send --to B --type command    │
+   │  "运行 factor_pipeline.py"                │
+   │──────────────────────────────────────────►│
+   │                                          │
+   │                                    Auto-execute
+   │                                          │
+   │  ◄──────── result: "3 factors passed" ───│
+   │                                          │
+```
+
+### Command types
+
+| Type | Purpose | Auto-execute? |
+|:--|:--|:--:|
+| `command` | Execute an action | ✅ (P1-P3) |
+| `review` | Review a task | ✅ |
+| `notify` | Information only | ✅ |
+| `approve` | Approve a task | ❌ (needs user) |
+| `reject` | Reject a task | ❌ (needs user) |
+| `delegate` | Forward a task | ❌ (needs user) |
+
+P0 commands always require user confirmation for safety.
+
+### Usage
+
+```bash
+# Send a command
+collab cmd send --from claude-01 --to workbuddy-01 \
+  --type command --instruction "运行 factor_pipeline.py" --priority P1
+
+# List pending commands
+collab cmd list --to workbuddy-01 --status pending
+
+# Auto-execute all pending commands for an agent
+collab cmd exec --agent workbuddy-01
+
+# View command details
+collab cmd status CMD-xxx
+```
+
+### How auto-execution works
+
+1. Agent receives a command (via inbox or LAN sync)
+2. On next startup (handshake) or heartbeat check, agent finds pending commands
+3. Non-P0 commands are executed automatically
+4. Results are written back to the command file
+5. Sender is notified via inbox
+
+<br/>
+
+## Self-review — Auto quality check {#self-review}
+
+Before submitting work to the user, agents can automatically review their own work.
+
+```
+Agent finishes task
+       │
+       ▼
+collab review self T-001 --agent claude-01
+       │
+       ▼
+┌──────────────────────────────────┐
+│ Check 1: completeness     ✅ 80  │
+│ Check 2: self_check       ✅ 70  │
+│                                  │
+│ Result: PASSED (avg 75)          │
+└──────────────────────────────────┘
+       │
+       ▼
+  Submit to user for final approval
+```
+
+### Review modes
+
+| Mode | When | How |
+|:--|:--|:--|
+| **Self-review** | P2+ tasks | Agent checks itself using a checklist |
+| **Peer review** | P0/P1 tasks | Other agents (L3+) review the work |
+| **Multi-review** | Critical tasks | Multiple reviewers, all must pass |
+
+### Usage
+
+```bash
+# Self-review (P2+ tasks)
+collab review self T-001 --agent claude-01
+
+# Create multi-dimensional review
+collab review create --task T-001 --by claude-01 --checks code_quality,test_coverage
+
+# Submit review result
+collab review submit RVW-xxx code_quality --reviewer reasonix-01 --passed true --score 85
+
+# Check review status
+collab review status RVW-xxx
+```
+
+<br/>
+
 ## Complete walkthrough {#complete-walkthrough}
 
 See the real-world walkthrough in the detailed READMEs:
@@ -409,6 +518,18 @@ collab memory stats                             Layer statistics
 # ── Heartbeat ──
 collab heartbeat <id>                           Start persistent monitoring
 collab heartbeat <id> --once                    Single check (exit 2 = P0/P1)
+
+# ── Agent Commands ──
+collab cmd send --from <id> --to <id>           Send command to another agent
+collab cmd list [--to <id>] [--status <s>]      List commands
+collab cmd exec --agent <id>                    Auto-execute pending commands
+collab cmd status <cmd-id>                      View command details
+
+# ── Self-Review ──
+collab review self <task-id> --agent <id>       Self-review (checklist)
+collab review create --task <id>                Create multi-dimensional review
+collab review submit <id> <check>               Submit review result
+collab review status <id>                       View review status
 
 # ── LAN Node ──
 collab node start [--agents <ids>] [--port N]   Start LAN node

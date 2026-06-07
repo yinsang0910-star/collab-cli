@@ -276,6 +276,61 @@ L0 SHARD（活记忆，≤80行）→ L1 memory（片段，≤50行/文件）→
 
 <br/>
 
+## Agent 间指令——不需要用户介入 {#agent-指令}
+
+**之前**：用户告诉 A → A 发 inbox → 用户打开 B → B 读 inbox → B 执行
+**现在**：A 发指令 → B 自动执行 → 结果自动回传给 A
+
+```
+Agent A                                    Agent B
+   │                                          │
+   │  collab cmd send --to B                   │
+   │  "运行 factor_pipeline.py"                │
+   │──────────────────────────────────────────►│
+   │                                          │
+   │                                    自动执行
+   │                                          │
+   │  ◄──────── 结果: "3个因子通过" ───────────│
+```
+
+### 指令类型
+
+| 类型 | 用途 | 自动执行？ |
+|:--|:--|:--:|
+| `command` | 执行一个操作 | ✅ (P1-P3) |
+| `review` | 审查任务 | ✅ |
+| `notify` | 仅通知 | ✅ |
+| `approve` | 审批通过 | ❌ (需用户) |
+| `reject` | 打回重做 | ❌ (需用户) |
+
+```bash
+collab cmd send --from claude-01 --to workbuddy-01 \
+  --type command --instruction "运行 factor_pipeline.py" --priority P1
+
+collab cmd list --to workbuddy-01 --status pending
+collab cmd exec --agent workbuddy-01
+```
+
+## 自审查——提交前自动检查 {#自审查}
+
+agent 完成任务后，自动审查再提交给用户。
+
+```bash
+# 自审（P2+ 任务）
+collab review self T-001 --agent claude-01
+
+# 多维度审查
+collab review create --task T-001 --by claude-01 --checks code_quality,test_coverage
+
+# 提交审查结果
+collab review submit RVW-xxx code_quality --reviewer reasonix-01 --passed true --score 85
+```
+
+审查通过 → 提交给用户确认
+审查失败 → 打回重做 + 附带具体问题
+
+<br/>
+
 ## Agent 接入 {#agent-接入}
 
 | Agent | 接入方式 | 文件 |
@@ -391,6 +446,18 @@ collab memory stats                             记忆层级统计
 # ── 心跳 ──
 collab heartbeat <id>                           启动持久监控
 collab heartbeat <id> --once                    单次检查（exit 2 = 有 P0/P1）
+
+# ── Agent 指令 ──
+collab cmd send --from <id> --to <id>           发送指令给另一个 agent
+collab cmd list [--to <id>] [--status <s>]      列出待处理指令
+collab cmd exec --agent <id>                    自动执行待处理指令
+collab cmd status <cmd-id>                      查看指令详情
+
+# ── 自审查 ──
+collab review self <task-id> --agent <id>       自审（自检清单）
+collab review create --task <id>                创建多维度审查
+collab review submit <id> <check>               提交审查结果
+collab review status <id>                       查看审查状态
 
 # ── LAN 节点 ──
 collab node start [--agents <ids>] [--port N]   启动 LAN 节点
