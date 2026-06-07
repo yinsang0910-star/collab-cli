@@ -2,6 +2,33 @@
 
 All notable changes to collab-cli will be documented in this file.
 
+## [1.4.1] - 2026-06-07
+
+### Fixed (Second Security Audit — 9 CRITICAL + 6 MEDIUM)
+
+**Dashboard Security:**
+- CRITICAL: Server now binds to `127.0.0.1` only (was `0.0.0.0`)
+- CRITICAL: Added localhost check on all incoming requests
+- CRITICAL: AgentId validation with regex in `/api/inbox/` route
+- CRITICAL: HTML escape all user-controlled data (XSS prevention)
+- Added graceful shutdown (SIGINT handler)
+
+**MCP Server Security:**
+- CRITICAL: Path traversal protection in `collab_memory_write` (filename sanitization)
+- CRITICAL: L3+ permission check for `collab_shard_update` (was no auth)
+- CRITICAL: L4 badge issuance restricted to CLI only (prevents privilege escalation)
+- Added `getAgentRole()` helper for permission checks
+
+**Sync Security:**
+- CRITICAL: `_handleSyncShard` now validates + sanitizes incoming data (whitelist fields)
+- CRITICAL: `_handleSyncTasks` now validates task.id + path containment
+- CRITICAL: `pullFromPeer` now checks SHARD version before overwrite (was silent data loss)
+
+**Other Fixes:**
+- MEDIUM: git-sync uses `execFileSync` instead of `execSync` (prevents shell injection)
+- MEDIUM: `selfReview` now checks actual task status (was always passing with hardcoded score)
+- MEDIUM: `updateCommand` returns correct `oldStatus` (was returning newStatus)
+
 ## [1.4.0] - 2026-06-06
 
 ### Added
