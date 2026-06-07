@@ -24,6 +24,7 @@
 
 ## Table of Contents
 
+- [Sound familiar? (Why you need this)](#sound-familiar)
 - [What is this?](#what-is-this)
 - [Two modes: Single device vs Multi-device](#two-modes)
 - [How it works (protocols & principles)](#how-it-works)
@@ -39,6 +40,23 @@
 - [Development](#development)
 
 ---
+
+## 🤔 Sound familiar? {#sound-familiar}
+
+If you use multiple AI coding tools, you've probably run into these:
+
+| Problem | What happens |
+|:--|:--|
+| 😵 **Out of sync** | Claude Code changed the API, WorkBuddy didn't know — implemented the same thing twice |
+| 🔄 **Repeating yourself** | Every new session means re-explaining the project background, architecture, and past decisions from scratch |
+| 🚫 **Permission chaos** | An executor agent accidentally modified a config file it shouldn't have touched |
+| 📨 **Lost messages** | You sent a review request to another agent, but they never saw it — no notification, no check |
+| 📝 **Memory bloat** | Shared docs keep growing to hundreds of lines, every startup wastes tokens reading it all |
+| 🐌 **Manual coordination** | Every cross-agent task requires you to relay messages, open sessions, and manually trigger work |
+
+**collab-cli solves all of these.** It gives every agent a shared memory, a message inbox, a task board, and a handshake protocol — so they can work together without you acting as the router.
+
+<br/>
 
 ## What is this? {#what-is-this}
 
