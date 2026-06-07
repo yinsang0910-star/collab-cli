@@ -40,6 +40,9 @@ import * as nodeCmd from '../src/commands/node.js';
 import * as setupCmd from '../src/commands/setup.js';
 import * as dashboardCmd from '../src/commands/dashboard.js';
 import * as gitSyncCmd from '../src/commands/git-sync.js';
+import * as commandCmd from '../src/commands/command.js';
+import * as reviewCmd from '../src/commands/review.js';
+import { executePendingCommands, formatExecutionReport } from '../src/commands/executor.js';
 import { handshake } from '../src/core/protocol.js';
 
 // ── 参数解析 ──
@@ -116,6 +119,12 @@ try {
       break;
     case 'git':
       cmdGit();
+      break;
+    case 'cmd':
+      cmdCmd();
+      break;
+    case 'review':
+      cmdReview();
       break;
     case 'node':
       await cmdNode();
@@ -672,7 +681,159 @@ async function cmdNode() {
   }
 }
 
-// ── 帮助和版本 ──
+function cmdCmd() {
+  const sharedDir = getSharedDir();
+  const cmdSubcommand = subcommand;
+
+  switch (cmdSubcommand) {
+    case 'send': {
+      const from = getFlag('from');
+      const to = getFlag('to');
+      const type = getFlag('type', 'command');
+      const priority = getFlag('priority', 'P2');
+      const instruction = getFlag('instruction') || getFlag('body', '');
+      const taskId = getFlag('task');
+      const context = getFlag('context');
+
+      const result = commandCmd.createCommand(sharedDir, {
+        from, to, type, priority, instruction, task_id: taskId, context,
+      });
+
+      if (result.success) {
+        console.log(`✅ 指令已发送: ${result.id}`);
+      } else {
+        console.error(`❌ ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+    case 'list': {
+      const to = getFlag('to');
+      const from = getFlag('from');
+      const status = getFlag('status');
+      const commands = commandCmd.listCommands(sharedDir, { to, from, status });
+      console.log(commandCmd.formatCommandList(commands));
+      break;
+    }
+    case 'exec': {
+      const agentId = getFlag('agent');
+      if (!agentId) {
+        console.error('用法: collab cmd exec --agent <id>');
+        process.exit(1);
+      }
+      // 同步执行待处理指令
+      executePendingCommands(sharedDir, agentId, async (cmd) => {
+        console.log(`   执行: ${cmd.id} — ${cmd.instruction?.split('\n')[0]?.slice(0, 60)}`);
+        // 默认执行器：只处理 notify 类型
+        if (cmd.type === 'notify') {
+          return { success: true, result: '已通知' };
+        }
+        return { success: false, result: '需要 agent 自行执行' };
+      }).then(report => {
+        const text = formatExecutionReport(report);
+        if (text) console.log(text);
+      });
+      break;
+    }
+    case 'status': {
+      const cmdId = args[3];
+      if (!cmdId) {
+        console.error('用法: collab cmd status <cmd-id>');
+        process.exit(1);
+      }
+      const cmd = commandCmd.getCommand(sharedDir, cmdId);
+      console.log(commandCmd.formatCommandDetail(cmd));
+      break;
+    }
+    default:
+      console.error('用法: collab cmd <send|list|exec|status>');
+      console.error('  collab cmd send --from A --to B --type command --instruction "做X"');
+      console.error('  collab cmd list [--to <id>] [--status pending]');
+      console.error('  collab cmd exec --agent <id>');
+      console.error('  collab cmd status <cmd-id>');
+      process.exit(1);
+  }
+}
+
+function cmdReview() {
+  const sharedDir = getSharedDir();
+  const reviewSubcommand = subcommand;
+
+  switch (reviewSubcommand) {
+    case 'create': {
+      const taskId = getFlag('task');
+      const requestedBy = getFlag('by', 'system');
+      const checks = getFlag('checks') ? getFlag('checks').split(',') : null;
+
+      const result = reviewCmd.createReview(sharedDir, { taskId, requestedBy, checks });
+      if (result.success) {
+        console.log(`✅ 审查已创建: ${result.id}`);
+      } else {
+        console.error(`❌ ${result.error}`);
+        process.exit(1);
+      }
+      break;
+    }
+    case 'submit': {
+      const reviewId = args[3];
+      const checkName = args[4];
+      const passed = getFlag('passed', 'true') === 'true';
+      const score = parseInt(getFlag('score', '80'));
+      const notes = getFlag('notes', '');
+      const reviewer = getFlag('reviewer', 'system');
+
+      const result = reviewCmd.submitCheck(sharedDir, reviewId, checkName, {
+        reviewer, passed, score, notes,
+      });
+
+      if (result.success) {
+        console.log(`✅ 审查维度 "${checkName}" 已提交`);
+        if (result.allDone) {
+          console.log(`   审查 ${reviewId} 全部完成: ${result.status}`);
+        }
+      } else {
+        console.error(`❌ ${result.error}`);
+      }
+      break;
+    }
+    case 'self': {
+      const taskId = args[3];
+      const agentId = getFlag('agent', 'system');
+
+      if (!taskId) {
+        console.error('用法: collab review self <task-id> --agent <id>');
+        process.exit(1);
+      }
+
+      const result = reviewCmd.selfReview(sharedDir, taskId, agentId);
+      console.log(reviewCmd.formatReview(result.review));
+
+      if (result.passed) {
+        console.log('\n✅ 自审通过，可以提交用户确认');
+      } else {
+        console.log('\n❌ 自审未通过，需要修改后重新审查');
+      }
+      break;
+    }
+    case 'status': {
+      const reviewId = args[3];
+      if (!reviewId) {
+        console.error('用法: collab review status <review-id>');
+        process.exit(1);
+      }
+      const review = reviewCmd.getReview(sharedDir, reviewId);
+      console.log(reviewCmd.formatReview(review));
+      break;
+    }
+    default:
+      console.error('用法: collab review <create|submit|self|status>');
+      console.error('  collab review create --task T-xxx --by agent-id');
+      console.error('  collab review submit <review-id> <check-name> --passed true --score 85');
+      console.error('  collab review self <task-id> --agent agent-id');
+      console.error('  collab review status <review-id>');
+      process.exit(1);
+  }
+}
 
 function showHelp() {
   console.log(`
@@ -718,6 +879,16 @@ collab — 多智能体协作任务体系 CLI
   git init                       初始化 .shared/ 的 git 管理
   git sync [--push] [--pull]     自动 commit + push + pull
   git status                     显示未同步的变更
+
+  cmd send --from A --to B       发送指令给另一个 agent
+  cmd list [--to <id>]           列出待处理指令
+  cmd exec --agent <id>          执行待处理指令
+  cmd status <cmd-id>            查看指令详情
+
+  review create --task <id>      创建审查请求
+  review self <task-id>          自审（自检清单）
+  review submit <id> <check>     提交审查结果
+  review status <id>             查看审查状态
 
   node start                     启动 LAN 节点（跨设备协作）
   node pull --host <ip>          从远程节点拉取 SHARD + tasks
