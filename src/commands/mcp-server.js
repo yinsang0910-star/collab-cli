@@ -350,10 +350,15 @@ function handleToolCall(params) {
         break;
       }
       case 'collab_badge_issue': {
+        // L4 工牌只能由用户或现有 L4 签发
+        if (args.role === 'L4') {
+          result = 'Error: L4 badges must be issued by the user via CLI, not via MCP.';
+          break;
+        }
         const badgeResult = badgeCmd.issue(sharedDir, {
           agentId: args.agent_id,
           role: args.role,
-          assignedBy: args.assigned_by || 'user',
+          assignedBy: args.assigned_by || 'mcp',
           scope: args.scope,
         });
         result = badgeResult.success
@@ -379,19 +384,37 @@ function handleToolCall(params) {
       case 'collab_memory_write': {
         const memDir = path.join(sharedDir, 'memory');
         if (!fs.existsSync(memDir)) fs.mkdirSync(memDir, { recursive: true });
-        const memPath = path.join(memDir, args.filename);
+        // 路径穿越防护：只允许文件名，不允许路径分隔符
+        const safeName = (args.filename || '').replace(/[^a-zA-Z0-9._-]/g, '_');
+        if (!safeName || safeName.startsWith('.')) {
+          result = 'Error: Invalid filename';
+          break;
+        }
+        const memPath = path.join(memDir, safeName);
+        // 二次校验：确保最终路径在 memory/ 目录内
+        if (!memPath.startsWith(memDir)) {
+          result = 'Error: Path traversal detected';
+          break;
+        }
         const existing = fs.existsSync(memPath) ? fs.readFileSync(memPath, 'utf-8') : '';
         const timestamp = now();
         const entry = `\n\n## ${timestamp} (${args.agent_id || 'agent'})\n\n${args.content}`;
         fs.writeFileSync(memPath, existing + entry, 'utf-8');
-        result = `Memory written to memory/${args.filename}`;
+        result = `Memory written to memory/${safeName}`;
         break;
       }
       case 'collab_shard_update': {
+        // 权限检查：需要 L3+ 才能修改 SHARD
+        const agentRole = getAgentRole(sharedDir, args.agent_id);
+        if (!agentRole || ['L0', 'L1', 'L2'].includes(agentRole)) {
+          result = `Error: Permission denied. SHARD update requires L3+, agent ${args.agent_id} is ${agentRole || 'unregistered'}`;
+          break;
+        }
         const shardPath = path.join(sharedDir, 'SHARD.md');
         const { data, content } = yaml.safeRead(shardPath);
-        // 简单的 section 替换
-        const sectionRegex = new RegExp(`(## ${args.section}[\\s\\S]*?)(?=## |$)`);
+        // section 名称消毒
+        const safeSection = (args.section || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const sectionRegex = new RegExp(`(## ${safeSection}[\\s\\S]*?)(?=## |$)`);
         if (content.match(sectionRegex)) {
           const newContent = content.replace(sectionRegex, `## ${args.section}\n\n${args.content}\n`);
           yaml.write(shardPath, { ...data, last_updated_by: args.agent_id, last_updated_at: now() }, newContent);
@@ -549,6 +572,18 @@ function formatHandshakeReport(report) {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * 获取 agent 的角色级别
+ * @returns {string|null}
+ */
+function getAgentRole(sharedDir, agentId) {
+  if (!agentId) return null;
+  const badgePath = path.join(sharedDir, `BADGE-${agentId}.md`);
+  if (!fs.existsSync(badgePath)) return null;
+  const { data } = yaml.safeRead(badgePath);
+  return data.role || null;
 }
 
 // 启动日志（stderr，不干扰 stdout 的 JSON-RPC）

@@ -277,16 +277,36 @@ export class CollabServer {
   }
 
   _handleSyncShard(req, res, body) {
-    // 接收远程 SHARD 推送，带版本检查
+    // 接收远程 SHARD 推送，带版本检查 + 数据验证
+    if (!body.data || typeof body.content !== 'string') {
+      this._json(res, 400, { error: 'Missing data or content' });
+      return;
+    }
+
+    // 限制内容大小
+    if (body.content.length > MAX_BODY_SIZE) {
+      this._json(res, 413, { error: 'Content too large' });
+      return;
+    }
+
+    // 只允许特定的 frontmatter 字段（防止注入）
+    const allowedFields = ['version', 'last_updated_by', 'last_updated_at'];
+    const sanitizedData = {};
+    for (const key of allowedFields) {
+      if (body.data[key] !== undefined) {
+        sanitizedData[key] = body.data[key];
+      }
+    }
+
     const shardPath = path.join(this.sharedDir, 'SHARD.md');
     const current = yaml.safeRead(shardPath);
 
-    const remoteVersion = body.data?.version || 0;
-    const localVersion = current.data?.version || 0;
+    const remoteVersion = Number(sanitizedData.version) || 0;
+    const localVersion = Number(current.data?.version) || 0;
 
     // 远程版本更新 → 接受
     if (remoteVersion > localVersion) {
-      yaml.write(shardPath, body.data, body.content);
+      yaml.write(shardPath, sanitizedData, body.content);
       this._json(res, 200, {
         accepted: true,
         message: `SHARD updated: v${localVersion} → v${remoteVersion}`,
@@ -337,11 +357,18 @@ export class CollabServer {
     for (const task of body.tasks) {
       if (!task.id) continue;
 
+      // task.id 消毒：只允许字母数字和连字符
+      const safeId = task.id.replace(/[^a-zA-Z0-9-]/g, '');
+      if (!safeId) continue;
+
       // 查找本地是否已有此任务
-      const localFiles = fs.readdirSync(tasksDir).filter(f => f.startsWith(task.id));
+      const localFiles = fs.readdirSync(tasksDir).filter(f => f.startsWith(safeId + '-'));
       const localPath = localFiles.length > 0
         ? path.join(tasksDir, localFiles[0])
-        : path.join(tasksDir, `${task.id}-${(task.title || 'task').replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 40)}.md`);
+        : path.join(tasksDir, `${safeId}-${(task.title || 'task').replace(/[^a-zA-Z0-9一-鿿]/g, '-').slice(0, 40)}.md`);
+
+      // 二次校验：确保路径在 tasks/ 内
+      if (!localPath.startsWith(tasksDir)) continue;
 
       if (localFiles.length > 0) {
         // 已有 → 检查版本

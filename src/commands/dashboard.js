@@ -26,6 +26,15 @@ export function startDashboard(sharedDir, port) {
   const listenPort = parseInt(port || DEFAULT_PORT);
 
   const server = http.createServer((req, res) => {
+    // 只允许 localhost 访问
+    const remoteAddr = req.socket.remoteAddress || '';
+    const isLocal = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+    if (!isLocal) {
+      res.writeHead(403);
+      res.end('Forbidden: dashboard only accessible from localhost');
+      return;
+    }
+
     if (req.url === '/' || req.url === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(getHTML(sharedDir));
@@ -36,7 +45,13 @@ export function startDashboard(sharedDir, port) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(taskCmd.list(sharedDir)));
     } else if (req.url.startsWith('/api/inbox/')) {
-      const agentId = req.url.split('/').pop();
+      const agentId = req.url.split('/api/inbox/')[1]?.split('?')[0];
+      // 校验 agentId：只允许字母数字和连字符
+      if (!agentId || !/^[a-zA-Z0-9_-]+$/.test(agentId)) {
+        res.writeHead(400);
+        res.end('Invalid agent ID');
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(inboxCmd.check(sharedDir, agentId)));
     } else if (req.url === '/api/conflicts') {
@@ -51,9 +66,16 @@ export function startDashboard(sharedDir, port) {
     }
   });
 
-  server.listen(listenPort, '0.0.0.0', () => {
+  server.listen(listenPort, '127.0.0.1', () => {
     console.log(`\n🌐 Dashboard 已启动: http://localhost:${listenPort}`);
+    console.log(`   仅限本机访问`);
     console.log(`   按 Ctrl+C 停止\n`);
+  });
+
+  // 优雅退出
+  process.on('SIGINT', () => {
+    console.log('\n   正在停止 dashboard...');
+    server.close(() => process.exit(0));
   });
 
   return server;
@@ -67,6 +89,14 @@ function getHTML(sharedDir) {
 
   const badges = status.badges || [];
   const shard = status.shard || {};
+
+  // HTML 转义函数（防 XSS）
+  const esc = (s) => String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
   const taskStats = status.tasks || {};
 
   return `<!DOCTYPE html>
@@ -143,8 +173,8 @@ h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing:
     <h2>🪪 工牌 (${badges.length})</h2>
     ${badges.map(b => `
     <div class="stat">
-      <span class="stat-label">${b.agentId}</span>
-      <span class="badge badge-${b.role}">${b.role}</span>
+      <span class="stat-label">${esc(b.agentId)}</span>
+      <span class="badge badge-${esc(b.role)}">${esc(b.role)}</span>
     </div>`).join('')}
   </div>
 
@@ -194,11 +224,11 @@ h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing:
   ${tasks.length === 0 ? '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无任务</div>' : ''}
   ${tasks.map(t => `
   <div class="task-row">
-    <span class="task-id">${t.id}</span>
-    <span class="priority-${t.priority}">${t.priority}</span>
-    <span class="task-title">${t.title}</span>
-    <span style="color:#8b949e;font-size:12px">${t.assignee || '-'}</span>
-    <span class="task-status status-${t.status}">${t.status}</span>
+    <span class="task-id">${esc(t.id)}</span>
+    <span class="priority-${esc(t.priority)}">${esc(t.priority)}</span>
+    <span class="task-title">${esc(t.title)}</span>
+    <span style="color:#8b949e;font-size:12px">${esc(t.assignee || '-')}</span>
+    <span class="task-status status-${esc(t.status)}">${esc(t.status)}</span>
   </div>`).join('')}
 </div>
 

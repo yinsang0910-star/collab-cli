@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { now } from '../utils/timestamp.js';
 
 /**
@@ -90,9 +90,14 @@ export function gitSync(sharedDir, { agentId, push = false, pull = false } = {})
     const changedFiles = changes.map(l => l.slice(3).trim());
     const summary = summarizeChanges(changedFiles);
 
-    // Commit
+    // Commit（消毒 agentId 防止命令注入）
+    const safeAgentId = (agentId || 'system').replace(/[^a-zA-Z0-9_-]/g, '');
+    const safeSummary = summary.replace(/[^a-zA-Z0-9一-鿿, _-]/g, '');
+    const commitMsg = `collab sync: ${safeSummary} [${safeAgentId}]`;
+
     execSync('git add -A', { cwd: sharedDir, stdio: 'pipe' });
-    execSync(`git commit -m "collab sync: ${summary} [${agentId || 'system'}]"`, { cwd: sharedDir, stdio: 'pipe' });
+    // 使用 execFileSync 避免 shell 注入
+    execFileSync('git', ['commit', '-m', commitMsg], { cwd: sharedDir, stdio: 'pipe' });
     result.committed = true;
     result.message = `已提交: ${summary}`;
 

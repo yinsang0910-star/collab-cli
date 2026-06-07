@@ -187,6 +187,7 @@ export function updateCommand(sharedDir, cmdId, newStatus, { result, operator } 
     return { success: false, error: `非法状态转换: ${data.status} → ${newStatus}` };
   }
 
+  const oldStatus = data.status;
   data.status = newStatus;
   data.updated_at = now();
   data.updated_by = operator || 'system';
@@ -206,7 +207,7 @@ export function updateCommand(sharedDir, cmdId, newStatus, { result, operator } 
 
   yaml.write(filePath, data, newContent);
 
-  return { success: true, oldStatus: data.status, newStatus };
+  return { success: true, oldStatus, newStatus };
 }
 
 /**

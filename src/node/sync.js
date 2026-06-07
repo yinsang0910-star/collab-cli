@@ -185,14 +185,26 @@ export async function pullFromPeer(peerHost, peerPort, sharedDir, token) {
 
   const result = { shard: null, tasks: null };
 
-  // 拉取 SHARD
+  // 拉取 SHARD（带版本检查）
   try {
-    const resp = await fetch(`http://${peerHost}:${peerPort}/api/sync/shard`, { headers });
+    const resp = await fetch(`http://${peerHost}:${peerPort}/api/sync/shard`, {
+      headers,
+      signal: AbortSignal.timeout(10000),
+    });
     const data = await resp.json();
     if (data.data && data.content) {
       const shardPath = path.join(sharedDir, 'SHARD.md');
-      yaml.write(shardPath, data.data, data.content);
-      result.shard = { version: data.version || 0 };
+      const local = yaml.safeRead(shardPath);
+      const remoteVersion = Number(data.data.version) || 0;
+      const localVersion = Number(local.data?.version) || 0;
+
+      // 只接受更新的版本
+      if (remoteVersion > localVersion) {
+        yaml.write(shardPath, data.data, data.content);
+        result.shard = { version: remoteVersion };
+      } else {
+        result.shard = { version: localVersion, skipped: true };
+      }
     }
   } catch (e) {
     // 不可达

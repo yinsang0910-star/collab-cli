@@ -275,12 +275,14 @@ export function selfReview(sharedDir, taskId, agentId) {
     notes: completenessPassed ? '任务状态合理' : `任务状态异常: ${taskData.status}`,
   });
 
-  // 检查 2: 基本自检
+  // 检查 2: 进度日志是否已更新
+  const hasProgressLog = taskData.status === 'REVIEW' || taskData.status === 'DONE';
+  const progressScore = hasProgressLog ? 80 : 50;
   submitCheck(sharedDir, review.id, 'self_check', {
     reviewer: agentId,
-    passed: true,
-    score: 70,
-    notes: '自检清单通过',
+    passed: hasProgressLog,
+    score: progressScore,
+    notes: hasProgressLog ? '任务已提交审查' : '任务尚未提交审查（状态应为 REVIEW）',
   });
 
   const finalReview = getReview(sharedDir, review.id);

@@ -196,6 +196,7 @@ describe('Review: self-review', () => {
       priority: 'P2',
     });
     taskCmd.updateStatus(sharedDir, taskResult.id, 'IN_PROGRESS', { operator: 'claude-01' });
+    taskCmd.updateStatus(sharedDir, taskResult.id, 'REVIEW', { operator: 'claude-01' });
 
     const result = reviewCmd.selfReview(sharedDir, taskResult.id, 'claude-01');
     assert.ok(result.review);
