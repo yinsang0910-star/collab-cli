@@ -15,7 +15,9 @@ import * as taskCmd from './task.js';
 import * as inboxCmd from './inbox.js';
 import * as conflictCmd from './conflict.js';
 import * as memoryCmd from './memory.js';
+import * as commandCmd from './command.js';
 import * as yaml from '../core/yaml.js';
+import * as pipelineCmd from '../orchestrator/pipeline.js';
 
 const DEFAULT_PORT = 8080;
 
@@ -60,6 +62,12 @@ export function startDashboard(sharedDir, port) {
     } else if (req.url === '/api/memory') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(memoryCmd.stats(sharedDir)));
+    } else if (req.url === '/api/commands') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(commandCmd.listCommands(sharedDir)));
+    } else if (req.url === '/api/pipelines') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(pipelineCmd.listPipelines(sharedDir)));
     } else {
       res.writeHead(404);
       res.end('Not found');
@@ -230,6 +238,43 @@ h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing:
     <span style="color:#8b949e;font-size:12px">${esc(t.assignee || '-')}</span>
     <span class="task-status status-${esc(t.status)}">${esc(t.status)}</span>
   </div>`).join('')}
+</div>
+
+<!-- Orchestrator Commands -->
+<div class="card" style="margin-bottom:20px">
+  <h2>⚡ Agent 指令队列</h2>
+  ${(() => {
+    try {
+      const commands = commandCmd.listCommands(sharedDir);
+      if (commands.length === 0) return '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无待处理指令</div>';
+      return commands.map(c => `
+  <div class="task-row">
+    <span class="task-id">${esc(c.id)}</span>
+    <span class="priority-${esc(c.priority)}">${esc(c.priority)}</span>
+    <span class="task-title">${esc(c.type)}: ${(esc(c.instruction || '')).slice(0, 50)}</span>
+    <span style="color:#8b949e;font-size:12px">${esc(c.from)} → ${esc(c.to)}</span>
+    <span class="task-status status-${esc(c.status)}">${esc(c.status)}</span>
+  </div>`).join('');
+    } catch (e) { return ''; }
+  })()}
+</div>
+
+<!-- Pipelines -->
+<div class="card" style="margin-bottom:20px">
+  <h2>🔄 流水线</h2>
+  ${(() => {
+    try {
+      const pipelines = pipelineCmd.listPipelines(sharedDir);
+      if (pipelines.length === 0) return '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无流水线</div>';
+      return pipelines.map(p => `
+  <div class="task-row">
+    <span class="task-id">${esc(p.id)}</span>
+    <span class="task-title">${esc(p.name)}</span>
+    <span style="color:#8b949e;font-size:12px">${p.steps} 步 | ${esc(p.trigger)}</span>
+    <span class="task-status status-${esc(p.status)}">${esc(p.status)}</span>
+  </div>`).join('');
+    } catch (e) { return ''; }
+  })()}
 </div>
 
 <div style="text-align:center;color:#484f58;font-size:12px;padding:20px">

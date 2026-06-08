@@ -43,6 +43,9 @@ import * as gitSyncCmd from '../src/commands/git-sync.js';
 import * as commandCmd from '../src/commands/command.js';
 import * as reviewCmd from '../src/commands/review.js';
 import { executePendingCommands, formatExecutionReport } from '../src/commands/executor.js';
+import { Orchestrator } from '../src/orchestrator/engine.js';
+import * as pipelineCmd from '../src/orchestrator/pipeline.js';
+import * as yaml from '../src/core/yaml.js';
 import { handshake } from '../src/core/protocol.js';
 
 // ── 参数解析 ──
@@ -125,6 +128,15 @@ try {
       break;
     case 'review':
       cmdReview();
+      break;
+    case 'run':
+      await cmdRun();
+      break;
+    case 'pipeline':
+      await cmdPipeline();
+      break;
+    case 'agent':
+      cmdAgent();
       break;
     case 'node':
       await cmdNode();
@@ -835,6 +847,222 @@ function cmdReview() {
   }
 }
 
+async function cmdRun() {
+  const sharedDir = getSharedDir();
+  const agentId = subcommand;
+  const prompt = args.slice(3).join(' ');
+
+  if (!agentId || !prompt) {
+    console.error('用法: collab run <agent-id> "prompt"');
+    console.error('  collab run claude-01 "审查 src/auth/login.py"');
+    console.error('  collab run codex-01 "运行测试"');
+    process.exit(1);
+  }
+
+  // 加载 orchestrator 配置
+  const orch = new Orchestrator(sharedDir);
+  const configPath = path.join(sharedDir, 'orchestrator.yaml');
+
+  if (fs.existsSync(configPath)) {
+    // 配置文件已存在，自动注册
+  } else {
+    // 根据 agentId 推断类型
+    const type = inferAgentType(agentId);
+    orch.registerAgent(agentId, {
+      type,
+      timeout: parseInt(getFlag('timeout', '300000')),
+      model: getFlag('model'),
+    });
+  }
+
+  console.log(`🚀 执行: ${agentId} ← "${prompt.slice(0, 60)}${prompt.length > 60 ? '...' : ''}"`);
+  console.log('');
+
+  const result = await orch.run(agentId, prompt, {
+    timeout: parseInt(getFlag('timeout', '300000')),
+    model: getFlag('model'),
+  });
+
+  if (result.success) {
+    console.log(`✅ 完成 (${(result.duration / 1000).toFixed(1)}s)`);
+    console.log('─'.repeat(50));
+    console.log(result.output);
+    if (result.sessionId) {
+      console.log(`\n💡 会话 ID: ${result.sessionId}（可用于续接）`);
+    }
+  } else {
+    console.error(`❌ 失败: ${result.error}`);
+    process.exit(1);
+  }
+}
+
+async function cmdPipeline() {
+  const sharedDir = getSharedDir();
+  const pipeSubcommand = subcommand;
+
+  switch (pipeSubcommand) {
+    case 'list': {
+      const pipelines = pipelineCmd.listPipelines(sharedDir);
+      console.log(pipelineCmd.formatPipelineList(pipelines));
+      break;
+    }
+    case 'run': {
+      const pipelineId = args[3];
+      if (!pipelineId) {
+        console.error('用法: collab pipeline run <pipeline-id>');
+        process.exit(1);
+      }
+
+      const pipeline = pipelineCmd.loadPipeline(sharedDir, pipelineId);
+      if (!pipeline) {
+        console.error(`流水线 ${pipelineId} 不存在`);
+        process.exit(1);
+      }
+
+      const orch = new Orchestrator(sharedDir);
+      // 注册流水线中用到的所有 agent
+      const agentTypes = new Set(pipeline.steps.map(s => inferAgentType(s.agent)));
+      for (const type of agentTypes) {
+        // 会在执行时自动按需注册
+      }
+
+      // 手动注册所有步骤中的 agent
+      for (const step of pipeline.steps) {
+        if (!orch.agents.has(step.agent)) {
+          orch.registerAgent(step.agent, {
+            type: inferAgentType(step.agent),
+            timeout: 300000,
+          });
+        }
+      }
+
+      console.log(`📋 执行流水线: ${pipeline.name}`);
+      console.log(`   步骤: ${pipeline.steps.length}`);
+      console.log('');
+
+      const execId = `EX-${Date.now()}`;
+      pipelineCmd.updatePipelineStatus(sharedDir, pipelineId, 'running', execId);
+
+      const result = await orch.executePipeline(pipeline);
+
+      pipelineCmd.updatePipelineStatus(sharedDir, pipelineId,
+        result.needsApproval ? 'awaiting_approval' : 'completed',
+        execId
+      );
+
+      console.log('');
+      console.log('═'.repeat(50));
+      console.log(`📋 流水线 ${pipeline.name} 执行完成`);
+      console.log(`   执行 ID: ${result.executionId}`);
+
+      for (const [stepId, output] of Object.entries(result.results)) {
+        const isError = String(output).startsWith('ERROR:');
+        console.log(`\n   ${isError ? '❌' : '✅'} ${stepId}:`);
+        console.log(`   ${String(output).slice(0, 200)}${String(output).length > 200 ? '...' : ''}`);
+      }
+
+      if (result.needsApproval) {
+        console.log('\n   ⏳ 等待用户确认...');
+      }
+
+      break;
+    }
+    case 'create': {
+      const file = getFlag('file');
+      if (!file) {
+        console.error('用法: collab pipeline create --file pipeline.yaml');
+        process.exit(1);
+      }
+
+      const filePath = path.resolve(file);
+      if (!fs.existsSync(filePath)) {
+        console.error(`文件不存在: ${filePath}`);
+        process.exit(1);
+      }
+
+      const { data } = yaml.read(filePath);
+      const result = pipelineCmd.createPipeline(sharedDir, data);
+      if (result.success) {
+        console.log(`✅ 流水线已创建: ${result.id}`);
+        console.log(`   文件: ${result.path}`);
+      } else {
+        console.error('创建失败');
+      }
+      break;
+    }
+    default:
+      console.error('用法: collab pipeline <list|run|create>');
+      console.error('  collab pipeline list                    列出流水线');
+      console.error('  collab pipeline run <id>                执行流水线');
+      console.error('  collab pipeline create --file <path>    创建流水线');
+      process.exit(1);
+  }
+}
+
+function cmdAgent() {
+  const sharedDir = getSharedDir();
+  const agentSubcommand = subcommand;
+
+  switch (agentSubcommand) {
+    case 'list': {
+      const configPath = path.join(sharedDir, 'orchestrator.yaml');
+      if (!fs.existsSync(configPath)) {
+        console.log('📋 未配置编排器。运行 collab init 或创建 .shared/orchestrator.yaml');
+        break;
+      }
+      const { data } = yaml.safeRead(configPath);
+      if (!data.agents || Object.keys(data.agents).length === 0) {
+        console.log('📋 无注册 agent');
+        break;
+      }
+      console.log('📋 已注册 Agent:');
+      for (const [id, config] of Object.entries(data.agents)) {
+        console.log(`   ${id}: type=${config.type}, timeout=${config.timeout || 300000}ms`);
+      }
+      break;
+    }
+    case 'test': {
+      const agentId = args[3];
+      if (!agentId) {
+        console.error('用法: collab agent test <agent-id>');
+        process.exit(1);
+      }
+
+      const orch = new Orchestrator(sharedDir);
+      const type = inferAgentType(agentId);
+      orch.registerAgent(agentId, { type, timeout: 30000 });
+
+      console.log(`🧪 测试 agent: ${agentId} (type: ${type})`);
+
+      orch.testAgent(agentId).then(result => {
+        if (result.success) {
+          console.log(`✅ ${agentId} 可用 (${(result.duration / 1000).toFixed(1)}s)`);
+        } else {
+          console.error(`❌ ${agentId} 不可用: ${result.error}`);
+        }
+      });
+      break;
+    }
+    default:
+      console.error('用法: collab agent <list|test>');
+      process.exit(1);
+  }
+}
+
+/**
+ * 根据 agent ID 推断类型
+ */
+function inferAgentType(agentId) {
+  const id = agentId.toLowerCase();
+  if (id.includes('claude')) return 'claude';
+  if (id.includes('reasonix') || id.includes('rx')) return 'reasonix';
+  if (id.includes('codex')) return 'codex';
+  if (id.includes('aider')) return 'aider';
+  if (id.includes('workbuddy') || id.includes('wb')) return 'workbuddy';
+  if (id.includes('cursor')) return 'cursor';
+  return 'generic';
+}
+
 function showHelp() {
   console.log(`
 collab — 多智能体协作任务体系 CLI
@@ -889,6 +1117,13 @@ collab — 多智能体协作任务体系 CLI
   review self <task-id>          自审（自检清单）
   review submit <id> <check>     提交审查结果
   review status <id>             查看审查状态
+
+  run <agent-id> "prompt"        编排器：直接调用 agent
+  pipeline list                  列出流水线
+  pipeline run <id>              执行流水线
+  pipeline create --file <path>  创建流水线
+  agent list                     列出已注册 agent
+  agent test <id>                测试 agent 是否可用
 
   node start                     启动 LAN 节点（跨设备协作）
   node pull --host <ip>          从远程节点拉取 SHARD + tasks

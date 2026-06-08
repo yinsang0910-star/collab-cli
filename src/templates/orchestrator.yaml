@@ -1,0 +1,42 @@
+---
+# 编排器配置
+# 放置位置: .shared/orchestrator.yaml
+---
+
+agents:
+  claude-01:
+    type: claude
+    binary: claude
+    default_args: ["--output-format", "json"]
+    timeout: 300000      # 5 分钟
+    model: null          # 使用默认模型
+
+  reasonix-01:
+    type: reasonix
+    binary: reasonix
+    timeout: 300000
+
+  codex-01:
+    type: codex
+    binary: codex
+    default_args: ["--output-format", "json"]
+    timeout: 300000
+
+  aider-01:
+    type: aider
+    binary: aider
+    timeout: 300000
+
+  workbuddy-01:
+    type: workbuddy
+    poll_interval: 5000  # 5 秒轮询
+    max_polls: 60        # 最多 5 分钟
+
+  cursor-01:
+    type: cursor
+    timeout: 300000
+
+defaults:
+  working_directory: "."
+  timeout: 300000
+  approval_required: true
