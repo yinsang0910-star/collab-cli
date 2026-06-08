@@ -27,9 +27,14 @@
     "bin/",
     "src/commands/!(*.test).js",
     "src/core/!(*.test).js",
+    "src/node/!(*.test).js",
     "src/utils/!(*.test).js",
     "src/templates/",
-    "README.md"
+    "README.md",
+    "README.zh-CN.md",
+    "README.ja.md",
+    "README.ko.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node --test src/**/*.test.js"
