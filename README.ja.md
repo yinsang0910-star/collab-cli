@@ -7,359 +7,177 @@
   <img src="https://img.shields.io/npm/dm/collab-cli?color=3fb950&labelColor=161b22" alt="downloads"/>
   <img src="https://img.shields.io/github/stars/yinsang0910-star/collab-cli?color=dbab09&labelColor=161b22&logo=github" alt="stars"/>
   <img src="https://img.shields.io/npm/l/collab-cli?color=8b949e&labelColor=161b22" alt="license"/>
-  <img src="https://img.shields.io/badge/tests-95%20passing-brightgreen?labelColor=161b22" alt="tests"/>
+  <img src="https://img.shields.io/badge/tests-109%20passing-brightgreen?labelColor=161b22" alt="tests"/>
 </p>
 
 <br/>
 
-<p align="center">
-  <h1 align="center">🤝 collab-cli</h1>
-  <p align="center"><strong>複数のAIエージェントをリアルなチームのように協働させる</strong></p>
-  <p align="center">Claude Code、Reasonix、WorkBuddy、Cursor、Codexなど、あらゆるAIエージェントが一つのプロジェクトで役割分担・記憶共有・相互通信できるユニバーサルプロトコル＋CLIツール。</p>
-</p>
+<h1 align="center">🤝 collab-cli</h1>
+<p align="center"><strong>クロスデバイス AIエージェント協働 + 記憶共有</strong></p>
+<p align="center">異なるPC上の複数AIエージェントが、一つのチームのように働く — コンテキスト共有、直接コマンド、自動レビュー。</p>
 
 <br/>
 
 ---
 
-## 🤔 こんな経験はありませんか？
+## 一言で言うと
 
-| 問題 | シーン |
-|:--|:--|
-| 😵 **情報の非同期** | Claude Codeがコードを変更したのにWorkBuddyが知らず、同じ実装を繰り返す |
-| 🔄 **繰り返しの説明** | 新しいセッションごとにプロジェクト背景・アーキテクチャ・過去の決定を再説明 |
-| 🚫 **権限の混乱** | 実行エージェントが変更すべきでない設定ファイルを誤って編集 |
-| 📨 **コミュニケーションの断絶** | 他エージェントにレビュー依頼を送ったが、相手が全く気づかない |
-| 📝 **記憶の肥大化** | 共有ドキュメントが膨張し、毎回数百行を読み込んでトークンを浪費 |
-
-**collab-cli はこれらすべてを解決します。**
+> **異なるPCにAIエージェントがいますか？collab-cliはそれらを協働させます — 記憶を共有し、コマンドを送信し、お互いの仕事をレビュー。あなたがメッセンジャーになる必要はありません。**
 
 <br/>
 
-## ✨ コア機能一覧
+## 4つのユニークな機能
+
+### 1. 🌐 クロスデバイス協働
+
+**異なるPC**上のエージェントがLAN経由で自動発見・リアルタイム同期。
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   🪪 バッジシステム    各エージェントに身分を発行、L0-L4 5段階   │
-│   🧠 3層メモリ        ライブ(80行) + フラグメント(50行) + アーカイブ │
-│   📋 タスクボード      作成→割当→実行→レビュー→完了、フルサイクル │
-│   📬 インボックス      P0-P3優先度、タスク関連、応答必須フラグ   │
-│   🤝 ハンドシェイク    起動時に自動：状態読取→バッジ取得→確認    │
-│   💓 ハートビート      常駐エージェントのinbox自動巡回           │
-│   ⚡ コンフリクト      楽観的ロック + 自動検出 + 総工裁定       │
-│   🔌 MCPサーバー      プラグイン統合、12の構造化ツール           │
-│   🌐 LANノード        クロスデバイス協働                        │
-│   🔄 自動同期        SHARD + tasks 10秒ごとに同期              │
-│   🚀 セットアップ    シングル/マルチデバイス初期化ガイド         │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+PC A (192.168.1.100)                    PC B (192.168.1.101)
+┌──────────────────────┐                ┌──────────────────────┐
+│  Codex-1             │   UDP自動      │  Codex-2             │
+│  collab node :9527   │◄──発見──────►│  collab node :9527   │
+│  SHARD ◄── 同期 ─────┼──────────────►│  SHARD               │
+│  tasks ◄── 同期 ─────┼──────────────►│  tasks               │
+│  inbox ◄── リアルタイム┼──────────────►│  inbox               │
+└──────────────────────┘                └──────────────────────┘
 ```
+
+**クラウド不要。サーバー不要。同じWi-Fiだけで動作。**
+
+### 2. 🧠 膨張しない共有記憶
+
+80行のファイルを読むだけでプロジェクト全体を理解。古いエントリは自動アーカイブ。新エージェントは30秒でオンボーディング。
+
+### 3. 📨 エージェントが直接コマンド
+
+ユーザーへの伝言は不要。AがBにコマンド送信→Bが自動実行→結果をAに返送。
+
+### 4. 🔍 提出前の自動レビュー
+
+コード品質・テストカバレッジ・ドキュメントを自動チェック。不合格は具体的なフィードバック付きで自動差戻し。
 
 <br/>
 
-## 🚀 30秒で体験
+## 対応エージェント
+
+| エージェント | 統合方法 | セットアップ時間 |
+|:--|:--|:--|
+| **Claude Code** | `.claude/CLAUDE.md` に追記 | 1分 |
+| **Reasonix** | `.reasonix/system.md` にコピー or MCPプラグイン | 1分 |
+| **WorkBuddy** | `.workbuddy/memory/MEMORY.md` に追記 | 1分 |
+| **Cursor** | `.cursor/rules` に統合 | 1分 |
+| **Codex** | `AGENTS.md` としてコピー | 1分 |
+| **任意エージェント** | プロジェクトルートに `AGENT_PROTOCOL.md` | 1分 |
+
+**ファイルだけ。** SDK不要、ランタイム依存なし、ベンダーロックインなし。
+
+<br/>
+
+## 30秒で始められる
 
 ```bash
-# Step 1: インストール
 npm i -g collab-cli
 
-# Step 2: プロジェクトで初期化
-cd my-awesome-project
-collab init --project "マイプロジェクト"
+# シングルPC
+collab setup --devices 1 --project "マイプロジェクト"
 
-# Step 3: エージェントにバッジ発行
-collab badge issue claude-01 --role L4 --assigned-by user     # Claude = 総工
-collab badge issue reasonix-01 --role L2 --assigned-by user   # Reasonix = コントリビューター
-
-# Step 4: 協働をシミュレーション
-collab task create "ユーザーログイン実装" --assignee claude-01 --priority P0
-collab inbox send --from claude-01 --to reasonix-01 --title "ログインモジュールのレビューをお願いします" --priority P1 --needs-reply
-collab handshake claude-01   # Claudeが参加時に自動で全情報を読み取り
-```
-
-`collab status` で全体像を確認：
-
-```
-📋 コラボレーション状態 — マイプロジェクト
-──────────────────────────────────────────────────
-
-📝 SHARD (L0ライブメモリ): 13/80行
-
-🪪 バッジ (2枚):
-   claude-01: L4 (user)
-   reasonix-01: L2 (user)
-
-📋 タスク: 1件
-   IN_PROGRESS: 0 | ASSIGNED: 1
-
-📬 インボックス: 1件未読
-   reasonix-01: 1件未読 (P0:0 P1:1)
-
-🧠 メモリ: L1 0ファイル, L2 アーカイブ 0
+# マルチデバイス
+collab setup --devices 2 \
+  --device-1 "PC-A:codex-1@Codex" \
+  --device-2 "PC-B:codex-2@Codex"
 ```
 
 <br/>
 
-## 🎯 こんな方におすすめ
+## 詳細ドキュメント
 
-| あなたは... | 得られるもの... |
-|:--|:--|
-| 🧑‍💻 **複数のAIコーディングツールを使っている開発者** | 全エージェントが同じプロジェクト状態を共有、説明の繰り返しなし |
-| 🏗️ **AIチームを構築するアーキテクト** | 標準化された役割権限・タスク配分・レビューフロー |
-| 🔬 **AIエージェントの研究者** | 再利用可能なマルチエージェント協働プロトコルの参照実装 |
-| 🤖 **AIエージェントを開発する人** | MCPプラグインであなたのエージェントをどこにでも即座に統合 |
+<details>
+<summary><strong>📋 コアコンセプト</strong>（バッジ、タスク、inbox、記憶、ハンドシェイク）</summary>
 
-<br/>
+### バッジ — ロールベース権限制御
 
-## 📖 完全なリアルシナリオ
+| レベル | 名前 | 権限 |
+|:--|:--|:--|
+| L0 | オブザーバー | 読み取り専用 |
+| L1 | エグゼキューター | 自タスク+inbox書き込み |
+| L2 | コントリビューター | L1+メモリ書き込み+レビュー提出 |
+| L3 | レビュアー | L2+タスク承認+SHARD書き込み |
+| L4 | 総工 | 全権限+タスク割当+バッジ管理 |
 
-> **シナリオ**：ECプラットフォームを開発中。Claude CodeでバックエンドAPIを書き、Reasonixでコードレビューを、スケジューラーエージェントで夜間バッチ処理を行う。
+### タスク — ライフサイクル管理
 
-### Step 1: プロジェクト初期化
+```
+DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE
+```
+
+### ハンドシェイク — 自動オンボーディング
+
+各エージェント起動時にSHARD+バッジ+inbox+タスクを自動読み取り。
+
+</details>
+
+<details>
+<summary><strong>📨 エージェントコマンド</strong>（エージェント間直接コマンド）</summary>
 
 ```bash
-collab init --project "ECプラットフォーム"
+collab cmd send --from claude-01 --to workbuddy-01 \
+  --type command --instruction "factor_pipeline.pyを実行" --priority P1
+
+collab cmd list --to workbuddy-01 --status pending
+collab cmd exec --agent workbuddy-01
 ```
 
-### Step 2: バッジ発行
+</details>
 
-```bash
-collab badge issue claude-01 --role L4 --assigned-by user     # 総工（全権限）
-collab badge issue workbuddy-01 --role L1 --assigned-by user  # エグゼキューター
-collab badge issue reasonix-01 --role L3 --assigned-by user   # レビュアー
-```
+<details>
+<summary><strong>🌐 LANノード</strong>（クロスデバイス同期詳細）</summary>
 
-### Step 3: 総工がタスクを配分
-
-```bash
-collab task create "商品検索の最適化" \
-  --assignee workbuddy-01 --priority P1 \
-  --deadline "2026-06-09T09:30:00+08:00" --by claude-01
-```
-
-### Step 4: エージェント間通信
-
-```bash
-collab inbox send \
-  --from workbuddy-01 --to claude-01 \
-  --title "検索最適化スクリプト完了、レビューお願いします" \
-  --priority P1 --type review_request \
-  --body "スクリプト: services/search.py、ローカルテスト通過済み" \
-  --task T-001 --needs-reply
-```
-
-### Step 5: Claudeが次回起動時に自動認識
-
-```
-🤝 ハンドシェイク完了
-🪪 バッジ: L4 総工 | 📬 未読: 1件(P1) | 📋 アクティブタスク: 2件
-⚠️ P1未読メッセージが1件あります: "検索最適化スクリプト完了、レビューお願いします"
-```
-
-**「WorkBuddyからメッセージが来た」と手動で教える必要はありません——Claudeが自動で知ります。**
-
-<br/>
-
-## 🏗️ アーキテクチャ
-
-```
-あなたのプロジェクト/
-├── .shared/                        ← コラボレーションルート
-│   ├── MANIFEST.md                    システム宣言 + 役割定義
-│   ├── SHARD.md                       L0ライブメモリ（必読、≤80行）
-│   ├── BADGE-claude-01.md             Claudeのバッジ
-│   ├── BADGE-workbuddy-01.md          WorkBuddyのバッジ
-│   ├── inbox/{agent-id}/             メッセージ受信箱
-│   ├── tasks/T-xxx.md               タスクファイル（ステートマシン）
-│   ├── memory/                        L1メモリフラグメント
-│   ├── archive/                       L2アーカイブ（自動圧縮）
-│   └── conflicts/                     コンフリクト記録
-├── .claude/CLAUDE.md                ← Claude Codeハンドシェイク指示
-├── .reasonix/system.md              ← Reasonixハンドシェイク指示
-└── reasonix.toml                    ← Reasonix MCPプラグイン設定
-```
-
-<br/>
-
-## 🪪 バッジ権限
-
-```
-L4 総工 ──────┬── 全読み書き + タスク割当 + 昇降格 + バッジ管理
-              │
-L3 レビュアー ─┤── タスク承認 + SHARD書き込み + メモリ書き込み
-              │
-L2 コントリビューター ┤── メモリ書き込み + レビュー提出
-              │
-L1 エグゼキューター ──┤── 自タスク書き込み + inbox書き込み
-              │
-L0 オブザーバー ─────┴── 読み取り専用
-```
-
-<br/>
-
-## 🧠 メモリ減衰メカニズム
-
-```
-           ┌──────────────┐
-           │   SHARD.md   │  ← L0: 「今真実」だけを記録（≤80行）
-           └──────┬───────┘
-                  │ 80行超過 or タスク完了
-                  ▼
-           ┌──────────────┐
-           │   memory/    │  ← L1: トピック別（≤50行/ファイル）
-           └──────┬───────┘
-                  │ 毎週 or L1超過
-                  ▼
-           ┌──────────────┐
-           │   archive/   │  ← L2: 日付別圧縮（≤50行/日）
-           └──────────────┘
-```
-
-**効果**：新エージェントは80行を読むだけで全体像を把握。
-
-<br/>
-
-## 🔌 エージェント統合ガイド
-
-### Claude Code（1行）
-
-```bash
-cat node_modules/collab-cli/src/templates/CLAUDE_PROTOCOL.md >> .claude/CLAUDE.md
-```
-
-### Reasonix（3つの方法）
-
-**方法A: MCPプラグイン（推奨）** — `reasonix.toml` に追加：
-
-```toml
-[[plugins]]
-name = "collab"
-type = "stdio"
-command = "collab"
-args = ["mcp"]
-```
-
-12のツール（`mcp__collab__inbox_check`等）をネイティブに使用可能。
-
-**方法B: カスタムコマンド** — `/collab handshake` でハンドシェイク。
-
-**方法C: プロトコル注入** — `.reasonix/system.md` にプロトコルを配置。
-
-### WorkBuddy / Cursor / Codex
-
-```bash
-# WorkBuddy
-cat node_modules/collab-cli/src/templates/AGENT_PROTOCOL.md >> .workbuddy/MEMORY.md
-
-# Cursor
-cat node_modules/collab-cli/src/templates/CURSOR_PROTOCOL.md >> .cursor/rules
-
-# Codex
-cp node_modules/collab-cli/src/templates/CODEX_PROTOCOL.md ./AGENTS.md
-```
-
-<br/>
-
-## 📬 メッセージングシステム
-
-```bash
-# 送信
-collab inbox send --from claude-01 --to workbuddy-01 \
-  --title "緊急：ストップロス修正" --priority P0 --type task \
-  --body "ストップロス発動後にポジションがクリアされていない" --needs-reply
-
-# 確認
-collab inbox check workbuddy-01
-
-# 既読
-collab inbox read workbuddy-01 MSG-001
-```
-
-| メッセージタイプ | 用途 |
-|:--|:--|
-| `task` | タスク割当 |
-| `review_request` | レビュー依頼 |
-| `approval` | 承認/却下 |
-| `question` | 質問 |
-| `notification` | 通知 |
-| `response` | 返信 |
-
-<br/>
-
-## 💓 ハートビート
-
-```bash
-collab heartbeat claude-01            # 常駐モード（5分間隔）
-collab heartbeat claude-01 --once     # 単一チェック（exit 2 = 高優先度）
-collab heartbeat claude-01 --interval 60  # カスタム間隔
-```
-
-<br/>
-
-## ⚡ コンフリクト解決
-
-3層防護：予防（assignee明示）→ 検出（楽観的ロック）→ 裁定（総工が24h以内）
-
-<br/>
-
-## 🌐 LAN ノード — クロスデバイス協働
-
-異なるデバイス上のエージェントがLAN経由で協働可能。UDP自動発見、ゼロ設定。
-
-| ファイル | 同期？ | 方法 |
+| ファイル | 同期？ | 戦略 |
 |:--|:--:|:--|
-| `SHARD.md` | ✅ | バージョンベース、新しい方が勝ち |
-| `tasks/` | ✅ | ステートマージ、より進んだステータスが勝ち |
-| `inbox/` | ❌ | デバイスごとに独立 |
+| `SHARD.md` | ✅ | ベース、新しい方が勝ち |
+| `tasks/` | ✅ | ステータスマージ |
+| `memory/` | ✅ | 完全同期 |
+| `inbox/` | ❌ | デバイスごと独立 |
 
 ```bash
-# セットアップウィザード
-collab setup --devices 2 --device-1 "A:codex-1@Codex" --device-2 "B:codex-2@Codex"
-
-# デバイス A
 collab node start --agents codex-1
-
-# デバイス B
-collab node start --agents codex-2 --token <token>
-collab node pull --host 192.168.1.100 --port 9527 --token <token>
+collab node pull --host 192.168.1.100
+collab node status
 ```
 
+</details>
+
+<details>
+<summary><strong>📚 完全CLIリファレンス</strong></summary>
+
+```bash
+collab setup / init / status / handshake
+collab badge issue/show/list
+collab task create/list/status/update
+collab inbox check/send/read/done
+collab cmd send/list/exec/status
+collab review create/submit/self/status
+collab memory compact/stats
+collab conflict list/resolve
+collab heartbeat <id> [--once] [--interval N]
+collab dashboard [--port N]
+collab mcp
+collab node start/pull/status
+collab git init/sync/status
+```
+
+</details>
+
 <br/>
 
-## 🆚 他のソリューションとの比較
-
-| 特徴 | 手動調整 | Gitブランチ | **collab-cli** |
-|:--|:--:|:--:|:--:|
-| リアルタイムメッセージ | ❌ | ❌ | ✅ |
-| 役割権限制御 | ❌ | ブランチ単位 | ファイル単位 |
-| 共有記憶 | 口頭 | コミットメッセージ | 構造化3層メモリ |
-| タスクライフサイクル | 口頭 | PR/Issue | 組み込みステートマシン |
-| 新エージェント参加コスト | 全部再説明 | clone | ハンドシェイクで自動対齐 |
-| トークン消費 | 全量再読込 | N/A | ≤80行 |
-
-<br/>
-
-## 🛠️ 開発
+## 開発
 
 ```bash
 git clone https://github.com/yinsang0910-star/collab-cli.git
-cd collab-cli
-npm install
-npm test          # 64テスト全パス
-npm link
+cd collab-cli && npm install && npm test    # 109テスト全パス
 ```
 
-<br/>
-
-## 📄 License
+## ライセンス
 
 MIT
-
-<br/>
-
----
-
-<p align="center">
-  このプロジェクトが役に立ったら、⭐ をお願いします！
-</p>
