@@ -9,6 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import * as yaml from '../core/yaml.js';
 import { now } from '../utils/timestamp.js';
+import { notifyAgent } from './notify.js';
 
 const VALID_PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
 const VALID_TYPES = ['approval', 'review_request', 'question', 'notification', 'task', 'response'];
@@ -115,6 +116,20 @@ export function send(sharedDir, { from, to, priority, type, title, body, related
   ].join('\n');
 
   yaml.write(filePath, data, content);
+
+  // 写入通知文件（让目标 agent 能感知到新消息）
+  const projectRoot = path.dirname(sharedDir); // .shared/ 的父目录
+  try {
+    notifyAgent(projectRoot, to, {
+      from,
+      to,
+      priority: priority || 'P2',
+      title,
+      body,
+    });
+  } catch (e) {
+    // 通知失败不影响消息发送
+  }
 
   return { success: true, id: msgId, path: filePath };
 }

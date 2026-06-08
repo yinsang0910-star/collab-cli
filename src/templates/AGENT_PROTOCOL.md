@@ -17,6 +17,14 @@
 5. 检查 `.shared/tasks/` 中 assignee 为自己的 IN_PROGRESS 任务
 6. 输出握手摘要（简短），然后响应用户
 
+## 实时通知检查（每次响应前）
+
+每次响应用户前，检查 `.shared/notifications/{your-id}.md`：
+- 文件存在且 `has_unread: true` → 先告知用户有新消息
+- 处理完后清空通知
+
+这是单机模式下的准实时通知机制。
+
 ## 工牌权限
 
 | 级别 | 名称 | 核心权限 |
