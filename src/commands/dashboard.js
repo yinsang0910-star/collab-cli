@@ -97,191 +97,259 @@ function getHTML(sharedDir) {
 
   const badges = status.badges || [];
   const shard = status.shard || {};
-
-  // HTML 转义函数（防 XSS）
-  const esc = (s) => String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
   const taskStats = status.tasks || {};
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const shardPercent = Math.min(100, ((shard.lineCount || 0) / (shard.maxLines || 80)) * 100);
+  const shardColor = shardPercent > 90 ? 'var(--pico-color-red-500)' : shardPercent > 70 ? 'var(--pico-color-yellow-500)' : 'var(--pico-color-green-500)';
+
+  // 任务状态分布（用于图表）
+  const taskDistribution = JSON.stringify([
+    taskStats.draft || 0,
+    taskStats.assigned || 0,
+    taskStats.inProgress || 0,
+    taskStats.review || 0,
+    taskStats.done || 0,
+    taskStats.blocked || 0,
+  ]);
 
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>collab dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; }
-h1 { color: #58a6ff; margin-bottom: 20px; font-size: 24px; }
-h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
-.card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
-.stat { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #21262d; }
-.stat:last-child { border-bottom: none; }
-.stat-label { color: #8b949e; font-size: 13px; }
-.stat-value { color: #f0f6fc; font-weight: 600; font-size: 15px; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 2px; }
-.badge-L4 { background: #da3633; color: white; }
-.badge-L3 { background: #d29922; color: white; }
-.badge-L2 { background: #238636; color: white; }
-.badge-L1 { background: #1f6feb; color: white; }
-.badge-L0 { background: #30363d; color: #8b949e; }
-.task-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid #21262d; gap: 10px; }
-.task-row:last-child { border-bottom: none; }
-.task-id { color: #58a6ff; font-family: monospace; font-size: 13px; min-width: 80px; }
-.task-title { flex: 1; color: #f0f6fc; font-size: 14px; }
-.task-status { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.status-DRAFT { background: #30363d; color: #8b949e; }
-.status-ASSIGNED { background: #1f6feb; color: white; }
-.status-IN_PROGRESS { background: #d29922; color: white; }
-.status-REVIEW { background: #8957e5; color: white; }
-.status-DONE { background: #238636; color: white; }
-.status-BLOCKED { background: #da3633; color: white; }
-.priority-P0 { color: #f85149; font-weight: 700; }
-.priority-P1 { color: #d29922; font-weight: 600; }
-.priority-P2 { color: #58a6ff; }
-.priority-P3 { color: #8b949e; }
-.shard-content { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 12px; font-family: monospace; font-size: 13px; line-height: 1.5; max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
-.conflict-row { padding: 8px 0; border-bottom: 1px solid #21262d; font-size: 13px; }
-.progress-bar { background: #21262d; border-radius: 4px; height: 8px; overflow: hidden; margin-top: 4px; }
-.progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-.refresh-btn { background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.refresh-btn:hover { background: #30363d; }
+  :root {
+    --pico-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --pico-font-size: 14px;
+  }
+  body { padding: 1rem 2rem; max-width: 1400px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 1rem; }
+  header h1 { margin: 0; font-size: 1.5rem; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; background: var(--pico-color-green-500); border-radius: 50%; margin-right: 8px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .card { background: var(--pico-card-background); border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); padding: 1.2rem; transition: border-color 0.2s; }
+  .card:hover { border-color: var(--pico-primary); }
+  .card h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); margin-bottom: 0.8rem; border: none; padding: 0; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--pico-muted-border-color); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--pico-muted-color); font-size: 0.85rem; }
+  .stat-value { font-weight: 600; }
+  .role-badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .role-L4 { background: var(--pico-color-red-500); color: white; }
+  .role-L3 { background: var(--pico-color-yellow-500); color: #1a1a1a; }
+  .role-L2 { background: var(--pico-color-green-500); color: white; }
+  .role-L1 { background: var(--pico-color-blue-500); color: white; }
+  .role-L0 { background: var(--pico-muted-border-color); color: var(--pico-muted-color); }
+  .status-tag { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+  .s-DRAFT { background: var(--pico-muted-border-color); color: var(--pico-muted-color); }
+  .s-ASSIGNED { background: var(--pico-color-blue-500); color: white; }
+  .s-IN_PROGRESS { background: var(--pico-color-yellow-500); color: #1a1a1a; }
+  .s-REVIEW { background: #8957e5; color: white; }
+  .s-DONE { background: var(--pico-color-green-500); color: white; }
+  .s-BLOCKED { background: var(--pico-color-red-500); color: white; }
+  .p-P0 { color: var(--pico-color-red-500); font-weight: 700; }
+  .p-P1 { color: var(--pico-color-yellow-500); font-weight: 600; }
+  .p-P2 { color: var(--pico-color-blue-500); }
+  .p-P3 { color: var(--pico-muted-color); }
+  .task-table, .cmd-table { width: 100%; font-size: 0.85rem; }
+  .task-table th, .cmd-table th { text-align: left; color: var(--pico-muted-color); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .task-table td, .cmd-table td { padding: 0.6rem 0; vertical-align: middle; }
+  .progress { height: 6px; background: var(--pico-muted-border-color); border-radius: 3px; overflow: hidden; }
+  .progress-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .chart-container { position: relative; height: 200px; }
+  .empty-state { color: var(--pico-muted-color); font-size: 0.85rem; padding: 1.5rem 0; text-align: center; }
+  .refresh-btn { background: none; border: 1px solid var(--pico-muted-border-color); color: var(--pico-muted-color); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+  .refresh-btn:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+  footer { text-align: center; color: var(--pico-muted-color); font-size: 0.75rem; padding: 2rem 0 1rem; }
 </style>
 </head>
 <body>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <h1>🤝 collab dashboard</h1>
-  <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
-</div>
 
-<div class="grid">
-  <!-- SHARD -->
-  <div class="card">
-    <h2>📝 SHARD (L0 活记忆)</h2>
-    <div class="stat">
-      <span class="stat-label">行数</span>
-      <span class="stat-value">${shard.lineCount || 0}/${shard.maxLines || 80}</span>
-    </div>
-    <div class="progress-bar">
-      <div class="progress-fill" style="width:${Math.min(100, ((shard.lineCount || 0) / (shard.maxLines || 80)) * 100)}%;background:${(shard.lineCount || 0) > 80 ? '#da3633' : '#238636'}"></div>
-    </div>
-    <div class="stat">
-      <span class="stat-label">最后更新</span>
-      <span class="stat-value" style="font-size:12px">${shard.lastUpdatedBy || '-'} @ ${shard.lastUpdatedAt || '-'}</span>
-    </div>
+<header>
+  <h1>🤝 collab <small style="color:var(--pico-muted-color);font-weight:400">dashboard</small></h1>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="font-size:0.8rem;color:var(--pico-muted-color)"><span class="live-dot"></span>live</span>
+    <button class="refresh-btn" onclick="refreshAll()">刷新</button>
+  </div>
+</header>
+
+<main>
+  <!-- 顶部卡片网格 -->
+  <div class="grid">
+    <!-- SHARD -->
+    <article class="card">
+      <h2>📝 SHARD 活记忆</h2>
+      <div class="stat-row">
+        <span class="stat-label">使用量</span>
+        <span class="stat-value">${shard.lineCount || 0} / ${shard.maxLines || 80} 行</span>
+      </div>
+      <div class="progress" style="margin:0.5rem 0">
+        <div class="progress-bar" style="width:${shardPercent}%;background:${shardColor}"></div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">最后更新</span>
+        <span style="font-size:0.8rem">${esc(shard.lastUpdatedBy || '-')} · ${esc(shard.lastUpdatedAt || '-')}</span>
+      </div>
+    </article>
+
+    <!-- 工牌 -->
+    <article class="card">
+      <h2>🪪 工牌</h2>
+      ${badges.length === 0 ? '<div class="empty-state">无活跃工牌</div>' :
+        badges.map(b => `
+      <div class="stat-row">
+        <span class="stat-label">${esc(b.agentId)}</span>
+        <span class="role-badge role-${esc(b.role)}">${esc(b.role)}</span>
+      </div>`).join('')}
+    </article>
+
+    <!-- 任务统计 -->
+    <article class="card">
+      <h2>📋 任务概览</h2>
+      <div class="chart-container">
+        <canvas id="taskChart"></canvas>
+      </div>
+    </article>
+
+    <!-- 系统健康 -->
+    <article class="card">
+      <h2>🧠 系统健康</h2>
+      <div class="stat-row">
+        <span class="stat-label">L1 记忆片段</span>
+        <span class="stat-value">${memory.l1Files?.length || 0} 个</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">L2 归档</span>
+        <span class="stat-value">${memory.archiveFiles?.length || 0} 个</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">未解决冲突</span>
+        <span class="stat-value" ${conflicts.length > 0 ? 'style="color:var(--pico-color-red-500)"' : ''}>${conflicts.length}</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">总任务</span>
+        <span class="stat-value">${taskStats.total || 0}</span>
+      </div>
+    </article>
   </div>
 
-  <!-- Badges -->
-  <div class="card">
-    <h2>🪪 工牌 (${badges.length})</h2>
-    ${badges.map(b => `
-    <div class="stat">
-      <span class="stat-label">${esc(b.agentId)}</span>
-      <span class="badge badge-${esc(b.role)}">${esc(b.role)}</span>
-    </div>`).join('')}
-  </div>
-
-  <!-- Task Stats -->
-  <div class="card">
-    <h2>📋 任务概览</h2>
-    <div class="stat">
-      <span class="stat-label">总计</span>
-      <span class="stat-value">${taskStats.total || 0}</span>
+  <!-- 任务列表 -->
+  <article class="card" style="margin-bottom:1rem">
+    <h2>📋 任务列表</h2>
+    <div id="tasks-section">
+      ${tasks.length === 0 ? '<div class="empty-state">暂无任务</div>' : `
+      <table class="task-table">
+        <thead>
+          <tr><th>ID</th><th>优先级</th><th>标题</th><th>负责人</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          ${tasks.map(t => `
+          <tr>
+            <td><code>${esc(t.id)}</code></td>
+            <td><span class="p-${esc(t.priority)}">${esc(t.priority)}</span></td>
+            <td>${esc(t.title)}</td>
+            <td style="color:var(--pico-muted-color)">${esc(t.assignee || '-')}</td>
+            <td><span class="status-tag s-${esc(t.status)}">${esc(t.status)}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`}
     </div>
-    <div class="stat">
-      <span class="stat-label">进行中</span>
-      <span class="stat-value" style="color:#d29922">${taskStats.inProgress || 0}</span>
+  </article>
+
+  <!-- Agent 指令队列 -->
+  <article class="card" style="margin-bottom:1rem">
+    <h2>⚡ Agent 指令队列</h2>
+    <div id="commands-section">
+      ${(() => {
+        try {
+          const commands = commandCmd.listCommands(sharedDir);
+          if (commands.length === 0) return '<div class="empty-state">暂无待处理指令</div>';
+          return `<table class="cmd-table">
+            <thead><tr><th>ID</th><th>优先级</th><th>类型</th><th>指令</th><th>发送方 → 接收方</th><th>状态</th></tr></thead>
+            <tbody>${commands.map(c => `<tr>
+              <td><code>${esc(c.id)}</code></td>
+              <td><span class="p-${esc(c.priority)}">${esc(c.priority)}</span></td>
+              <td>${esc(c.type)}</td>
+              <td>${esc((c.instruction || '').slice(0, 50))}</td>
+              <td style="color:var(--pico-muted-color)">${esc(c.from)} → ${esc(c.to)}</td>
+              <td><span class="status-tag s-${esc(c.status)}">${esc(c.status)}</span></td>
+            </tr>`).join('')}</tbody>
+          </table>`;
+        } catch (e) { return '<div class="empty-state">暂无指令</div>'; }
+      })()}
     </div>
-    <div class="stat">
-      <span class="stat-label">待审查</span>
-      <span class="stat-value" style="color:#8957e5">${taskStats.review || 0}</span>
+  </article>
+
+  <!-- 流水线 -->
+  <article class="card" style="margin-bottom:1rem">
+    <h2>🔄 流水线</h2>
+    <div id="pipelines-section">
+      ${(() => {
+        try {
+          const pipelines = pipelineCmd.listPipelines(sharedDir);
+          if (pipelines.length === 0) return '<div class="empty-state">暂无流水线</div>';
+          return `<table class="task-table">
+            <thead><tr><th>ID</th><th>名称</th><th>步骤</th><th>触发</th><th>状态</th></tr></thead>
+            <tbody>${pipelines.map(p => `<tr>
+              <td><code>${esc(p.id)}</code></td>
+              <td>${esc(p.name)}</td>
+              <td>${p.steps}</td>
+              <td>${esc(p.trigger)}</td>
+              <td><span class="status-tag s-${esc(p.status)}">${esc(p.status)}</span></td>
+            </tr>`).join('')}</tbody>
+          </table>`;
+        } catch (e) { return '<div class="empty-state">暂无流水线</div>'; }
+      })()}
     </div>
-    <div class="stat">
-      <span class="stat-label">已完成</span>
-      <span class="stat-value" style="color:#238636">${taskStats.done || 0}</span>
-    </div>
-  </div>
+  </article>
+</main>
 
-  <!-- Memory -->
-  <div class="card">
-    <h2>🧠 记忆层级</h2>
-    <div class="stat">
-      <span class="stat-label">L1 片段</span>
-      <span class="stat-value">${memory.l1Files?.length || 0} 个文件</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">L2 归档</span>
-      <span class="stat-value">${memory.archiveFiles?.length || 0} 个文件</span>
-    </div>
-    ${conflicts.length > 0 ? `
-    <div class="stat">
-      <span class="stat-label">⚡ 冲突</span>
-      <span class="stat-value" style="color:#f85149">${conflicts.length} 个未解决</span>
-    </div>` : ''}
-  </div>
-</div>
+<footer>
+  collab-cli dashboard · <span id="last-update"></span> · auto-refresh 30s
+</footer>
 
-<!-- Tasks -->
-<div class="card" style="margin-bottom:20px">
-  <h2>📋 任务列表</h2>
-  ${tasks.length === 0 ? '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无任务</div>' : ''}
-  ${tasks.map(t => `
-  <div class="task-row">
-    <span class="task-id">${esc(t.id)}</span>
-    <span class="priority-${esc(t.priority)}">${esc(t.priority)}</span>
-    <span class="task-title">${esc(t.title)}</span>
-    <span style="color:#8b949e;font-size:12px">${esc(t.assignee || '-')}</span>
-    <span class="task-status status-${esc(t.status)}">${esc(t.status)}</span>
-  </div>`).join('')}
-</div>
+<script>
+  // 任务状态饼图
+  new Chart(document.getElementById('taskChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Draft', 'Assigned', 'In Progress', 'Review', 'Done', 'Blocked'],
+      datasets: [{
+        data: ${taskDistribution},
+        backgroundColor: [
+          '#30363d', '#1f6feb', '#d29922', '#8957e5', '#238636', '#da3633'
+        ],
+        borderWidth: 0,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#c9d1d9', font: { size: 11 }, padding: 8 } }
+      },
+      cutout: '65%'
+    }
+  });
 
-<!-- Orchestrator Commands -->
-<div class="card" style="margin-bottom:20px">
-  <h2>⚡ Agent 指令队列</h2>
-  ${(() => {
-    try {
-      const commands = commandCmd.listCommands(sharedDir);
-      if (commands.length === 0) return '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无待处理指令</div>';
-      return commands.map(c => `
-  <div class="task-row">
-    <span class="task-id">${esc(c.id)}</span>
-    <span class="priority-${esc(c.priority)}">${esc(c.priority)}</span>
-    <span class="task-title">${esc(c.type)}: ${(esc(c.instruction || '')).slice(0, 50)}</span>
-    <span style="color:#8b949e;font-size:12px">${esc(c.from)} → ${esc(c.to)}</span>
-    <span class="task-status status-${esc(c.status)}">${esc(c.status)}</span>
-  </div>`).join('');
-    } catch (e) { return ''; }
-  })()}
-</div>
+  // 时间戳
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
 
-<!-- Pipelines -->
-<div class="card" style="margin-bottom:20px">
-  <h2>🔄 流水线</h2>
-  ${(() => {
-    try {
-      const pipelines = pipelineCmd.listPipelines(sharedDir);
-      if (pipelines.length === 0) return '<div style="color:#8b949e;font-size:13px;padding:12px 0">暂无流水线</div>';
-      return pipelines.map(p => `
-  <div class="task-row">
-    <span class="task-id">${esc(p.id)}</span>
-    <span class="task-title">${esc(p.name)}</span>
-    <span style="color:#8b949e;font-size:12px">${p.steps} 步 | ${esc(p.trigger)}</span>
-    <span class="task-status status-${esc(p.status)}">${esc(p.status)}</span>
-  </div>`).join('');
-    } catch (e) { return ''; }
-  })()}
-</div>
-
-<div style="text-align:center;color:#484f58;font-size:12px;padding:20px">
-  collab-cli dashboard · auto-refresh in 30s
-</div>
-
-<script>setTimeout(() => location.reload(), 30000);</script>
+  // 局部刷新（30 秒）
+  function refreshAll() {
+    fetch('/api/status').then(r => r.json()).then(data => {
+      document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+      // 可以在这里更新更多 DOM 元素
+    }).catch(() => {});
+  }
+  setInterval(refreshAll, 30000);
+</script>
 </body>
 </html>`;
 }
