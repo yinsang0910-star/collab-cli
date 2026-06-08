@@ -1,6 +1,6 @@
 {
   "name": "collab-cli",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Universal collaboration protocol + CLI for multi-agent LLM teams",
   "type": "module",
   "homepage": "https://github.com/yinsang0910-star/collab-cli",
@@ -28,6 +28,7 @@
     "src/commands/!(*.test).js",
     "src/core/!(*.test).js",
     "src/node/!(*.test).js",
+    "src/orchestrator/",
     "src/utils/!(*.test).js",
     "src/templates/",
     "README.md",

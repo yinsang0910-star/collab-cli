@@ -2,6 +2,30 @@
 
 All notable changes to collab-cli will be documented in this file.
 
+## [1.6.0] - 2026-06-07
+
+### Added — Orchestrator + Pipeline + 6 Agent Adapters
+
+- **Orchestrator Engine** — Multi-agent orchestration:
+  - `collab run <agent-id> "prompt"` — Direct agent invocation
+  - 6 adapters: Claude, Reasonix, Codex, Aider, WorkBuddy, Cursor + Generic
+- **Pipeline Engine** — Multi-step workflows:
+  - YAML definition with step dependencies + variable substitution
+  - Error handling (abort/continue) + user approval gates
+- **CLI**: `collab run/pipeline/agent` commands
+- **Dashboard**: Agent Commands queue + Pipelines views
+
+## [1.5.0] - 2026-06-07
+
+### Added — Inbox Notification System
+
+- **Notification files** for single-device mode:
+  - `.claude/inbox-notification.md`
+  - `.workbuddy/inbox-notification.md`
+  - `.shared/notifications/{agent-id}.md`
+- `inbox.send()` now auto-writes notification to recipient
+- Agent protocol templates updated with "check notification before every response"
+
 ## [1.4.1] - 2026-06-07
 
 ### Fixed (Second Security Audit — 9 CRITICAL + 6 MEDIUM)
