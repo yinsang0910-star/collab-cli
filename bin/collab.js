@@ -42,6 +42,7 @@ import * as dashboardCmd from '../src/commands/dashboard.js';
 import * as gitSyncCmd from '../src/commands/git-sync.js';
 import * as commandCmd from '../src/commands/command.js';
 import * as reviewCmd from '../src/commands/review.js';
+import * as discoverCmd from '../src/commands/discover.js';
 import { executePendingCommands, formatExecutionReport } from '../src/commands/executor.js';
 import { Orchestrator } from '../src/orchestrator/engine.js';
 import * as pipelineCmd from '../src/orchestrator/pipeline.js';
@@ -137,6 +138,9 @@ try {
       break;
     case 'agent':
       cmdAgent();
+      break;
+    case 'discover':
+      cmdDiscover();
       break;
     case 'node':
       await cmdNode();
@@ -1052,6 +1056,18 @@ function cmdAgent() {
 /**
  * 根据 agent ID 推断类型
  */
+function cmdDiscover() {
+  const projectRoot = process.cwd();
+  const agents = discoverCmd.discoverAgents(projectRoot);
+  console.log(discoverCmd.formatDiscovery(agents));
+
+  if (hasFlag('generate-config')) {
+    const config = discoverCmd.generateConfig(agents);
+    console.log('\n--- 生成的 orchestrator.yaml ---');
+    console.log(config);
+  }
+}
+
 function inferAgentType(agentId) {
   const id = agentId.toLowerCase();
   if (id.includes('claude')) return 'claude';
@@ -1060,6 +1076,10 @@ function inferAgentType(agentId) {
   if (id.includes('aider')) return 'aider';
   if (id.includes('workbuddy') || id.includes('wb')) return 'workbuddy';
   if (id.includes('cursor')) return 'cursor';
+  if (id.includes('windsurf') || id.includes('codeium')) return 'windsurf';
+  if (id.includes('devin')) return 'devin';
+  if (id.includes('copilot')) return 'copilot';
+  if (id.includes('continue')) return 'continue';
   return 'generic';
 }
 
@@ -1124,6 +1144,9 @@ collab — 多智能体协作任务体系 CLI
   pipeline create --file <path>  创建流水线
   agent list                     列出已注册 agent
   agent test <id>                测试 agent 是否可用
+
+  discover                       自动检测已安装的 agent
+  discover --generate-config     检测并生成 orchestrator.yaml
 
   node start                     启动 LAN 节点（跨设备协作）
   node pull --host <ip>          从远程节点拉取 SHARD + tasks

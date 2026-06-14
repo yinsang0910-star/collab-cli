@@ -1,6 +1,6 @@
 {
   "name": "collab-cli",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Universal collaboration protocol + CLI for multi-agent LLM teams",
   "type": "module",
   "homepage": "https://github.com/yinsang0910-star/collab-cli",
@@ -18,7 +18,18 @@
     "protocol",
     "mcp",
     "claude",
-    "reasonix"
+    "reasonix",
+    "codex",
+    "aider",
+    "workbuddy",
+    "cursor",
+    "windsurf",
+    "devin",
+    "copilot",
+    "continue",
+    "orchestrator",
+    "pipeline",
+    "desktop"
   ],
   "bin": {
     "collab": "bin/collab.js"

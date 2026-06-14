@@ -248,6 +248,10 @@ export class Orchestrator {
     this.adapters.set('aider', AiderAdapter);
     this.adapters.set('workbuddy', WorkBuddyAdapter);
     this.adapters.set('cursor', CursorAdapter);
+    this.adapters.set('windsurf', WindsurfAdapter);
+    this.adapters.set('devin', DevinAdapter);
+    this.adapters.set('copilot', CopilotAdapter);
+    this.adapters.set('continue', ContinueAdapter);
     this.adapters.set('generic', GenericAdapter);
   }
 
@@ -556,6 +560,152 @@ class WorkBuddyAdapter extends BaseAdapter {
 class CursorAdapter extends WorkBuddyAdapter {
   constructor(config) {
     super({ ...config, binary: config.binary || 'cursor' });
+  }
+}
+
+/**
+ * Windsurf 适配器
+ *
+ * Windsurf (Codeium) 是一个 AI 编程 IDE
+ * CLI 模式: windsurf -p "prompt" 或通过扩展 API
+ */
+class WindsurfAdapter extends BaseAdapter {
+  constructor(config) {
+    super({ ...config, binary: config.binary || 'windsurf' });
+  }
+
+  async execute(prompt, opts = {}) {
+    // Windsurf 支持类似 Claude Code 的 CLI 模式
+    const args = ['-p', prompt, '--output-format', 'json'];
+    if (opts.model) args.push('--model', opts.model);
+    args.push(...this.defaultArgs);
+
+    try {
+      const result = await this._spawn(this.binary, args, {
+        cwd: opts.cwd,
+        timeout: opts.timeout,
+      });
+
+      let output = result.stdout;
+      try {
+        const parsed = JSON.parse(result.stdout);
+        output = parsed.result || parsed.content || result.stdout;
+      } catch (e) { /* not JSON */ }
+
+      return { output: output.trim(), sessionId: null };
+    } catch (err) {
+      // 回退到文件桥接
+      return this._fallbackFileBridge(prompt, opts);
+    }
+  }
+
+  async _fallbackFileBridge(prompt, opts) {
+    const tmpFile = path.join(this.sharedDir, '.tmp-prompt.md');
+    fs.writeFileSync(tmpFile, prompt, 'utf-8');
+    try {
+      const result = await this._spawn(this.binary, [tmpFile], {
+        cwd: opts.cwd,
+        timeout: opts.timeout,
+      });
+      return { output: result.stdout.trim(), sessionId: null };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore */ }
+    }
+  }
+}
+
+/**
+ * Devin 适配器
+ *
+ * Devin 是一个自主 AI 软件工程师
+ * 通过 API 或 CLI 交互
+ */
+class DevinAdapter extends WorkBuddyAdapter {
+  constructor(config) {
+    super({ ...config, binary: config.binary || 'devin' });
+    this.apiUrl = config.apiUrl || null;
+  }
+
+  async execute(prompt, opts = {}) {
+    // 如果配置了 API URL，使用 HTTP 调用
+    if (this.apiUrl) {
+      try {
+        const response = await fetch(`${this.apiUrl}/api/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt, cwd: opts.cwd }),
+          signal: AbortSignal.timeout(opts.timeout || 300000),
+        });
+        const data = await response.json();
+        return { output: data.result || data.output || '', sessionId: data.session_id };
+      } catch (e) {
+        // 回退到文件桥接
+      }
+    }
+    // 回退：文件桥接
+    return super.execute(prompt, opts);
+  }
+}
+
+/**
+ * GitHub Copilot CLI 适配器
+ *
+ * 调用方式: gh copilot -p "prompt" 或 copilot -p "prompt"
+ */
+class CopilotAdapter extends BaseAdapter {
+  constructor(config) {
+    super({ ...config, binary: config.binary || 'gh' });
+  }
+
+  async execute(prompt, opts = {}) {
+    const args = ['copilot', '-p', prompt, '--output-format', 'json'];
+    args.push(...this.defaultArgs);
+
+    const result = await this._spawn(this.binary, args, {
+      cwd: opts.cwd,
+      timeout: opts.timeout,
+    });
+
+    let output = result.stdout;
+    try {
+      const parsed = JSON.parse(result.stdout);
+      output = parsed.result || parsed.content || result.stdout;
+    } catch (e) { /* not JSON */ }
+
+    return { output: output.trim(), sessionId: null };
+  }
+}
+
+/**
+ * Continue 适配器
+ *
+ * Continue 是一个开源 AI 编程助手（VS Code / JetBrains 插件）
+ * 通过 HTTP API 或 CLI 交互
+ */
+class ContinueAdapter extends BaseAdapter {
+  constructor(config) {
+    super({ ...config, binary: config.binary || 'continue' });
+    this.apiUrl = config.apiUrl || 'http://localhost:6543';
+  }
+
+  async execute(prompt, opts = {}) {
+    // Continue 通过本地 HTTP API 交互
+    try {
+      const response = await fetch(`${this.apiUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }],
+          stream: false,
+        }),
+        signal: AbortSignal.timeout(opts.timeout || 300000),
+      });
+      const data = await response.json();
+      const output = data.choices?.[0]?.message?.content || '';
+      return { output, sessionId: null };
+    } catch (e) {
+      return { output: `ERROR: Continue API not available at ${this.apiUrl}`, sessionId: null };
+    }
   }
 }
 

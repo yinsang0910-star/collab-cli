@@ -2,6 +2,24 @@
 
 All notable changes to collab-cli will be documented in this file.
 
+## [1.7.0] - 2026-06-08
+
+### Added
+
+- **4 new Agent Adapters**: Windsurf, Devin, Copilot CLI, Continue (total: 10 agents)
+- **Agent Auto-Discovery** (`collab discover`): scan project for installed agents + generate config
+- **CLI i18n** (EN/ZH/JA/KO): `COLLAB_LANG` env var + `t()` translation function
+- **Integration Tests**: end-to-end collaboration flow (121 tests total)
+- Updated `orchestrator.yaml` template with all 10 agent types
+
+## [1.6.1] - 2026-06-07
+
+### Changed
+
+- Dashboard redesign: Pico CSS + Chart.js + modern dark theme
+- Proper HTML tables, responsive grid, live indicator animation
+- Partial refresh via Fetch API (no full page reload)
+
 ## [1.6.0] - 2026-06-07
 
 ### Added — Orchestrator + Pipeline + 6 Agent Adapters

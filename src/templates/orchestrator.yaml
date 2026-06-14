@@ -8,8 +8,8 @@ agents:
     type: claude
     binary: claude
     default_args: ["--output-format", "json"]
-    timeout: 300000      # 5 分钟
-    model: null          # 使用默认模型
+    timeout: 300000
+    model: null
 
   reasonix-01:
     type: reasonix
@@ -29,11 +29,30 @@ agents:
 
   workbuddy-01:
     type: workbuddy
-    poll_interval: 5000  # 5 秒轮询
-    max_polls: 60        # 最多 5 分钟
+    poll_interval: 5000
+    max_polls: 60
 
   cursor-01:
     type: cursor
+    timeout: 300000
+
+  windsurf-01:
+    type: windsurf
+    binary: windsurf
+    timeout: 300000
+
+  devin-01:
+    type: devin
+    timeout: 300000
+
+  copilot-01:
+    type: copilot
+    binary: gh
+    timeout: 300000
+
+  continue-01:
+    type: continue
+    api_url: "http://localhost:6543"
     timeout: 300000
 
 defaults:
