@@ -70,6 +70,55 @@ DRAFT → ASSIGNED → IN_PROGRESS → REVIEW → DONE
 collab status          # 查看全局状态
 collab inbox check     # 检查未读消息
 collab badge show      # 查看当前工牌
+collab badge check     # 检查操作权限
 collab task list       # 列出活跃任务
 collab memory compact  # 触发记忆归档
+```
+
+## WorkBuddy 集成指南
+
+> 如果你使用 WorkBuddy AI 编程助手，本协议与 WorkBuddy 的 xmgl 技能体系可无缝对接。
+
+### 基础接入
+
+将本协议注入 WorkBuddy 的全局记忆文件：
+
+```bash
+cat node_modules/collab-cli/src/templates/AGENT_PROTOCOL.md >> ~/.workbuddy/MEMORY.md
+```
+
+### 高级接入（推荐）
+
+安装 xmgl 技能体系后，collab 协议通过以下技能原生集成：
+
+| 技能 | 集成的 collab 能力 |
+|:-----|:------------------|
+| `project-lock` | 进门握手：自动读 SHARD + badge show + inbox check |
+| `session-guard` | 启动时比对 SHARD.md 与本地状态一致性 |
+| `checkpoint-guard` | 执行前校验工牌权限 (`badge check`) |
+| `shutdown-protocol` | 收工时触发全平台记忆压缩 (`collab memory compact`) |
+| `memory-efficiency` | SHARD 80 行硬上限 + 自动归档同步 |
+| `context-survival` | micro-log 中追加 Collab 协作状态摘要 |
+
+### 跨平台协同效果
+
+```
+WorkBuddy(总工 L4) ←→ Claude Code(审查 L3)
+     ↕                        ↕
+  .shared/SHARD.md ←──────────────┘
+     ↕
+  知识库检索 (knowledge-retrieve)
+  收工落盘 (shutdown-protocol)
+  质量门禁 (check-project-health)
+```
+
+### 权限预检示例
+
+```bash
+# WorkBuddy checkpoint-guard 在执行前自动调用
+collab badge check workbuddy-01 write_shard
+# → allowed (L4 总工有全部写入权限)
+
+collab badge check workbuddy-01 review_tasks
+# → allowed
 ```

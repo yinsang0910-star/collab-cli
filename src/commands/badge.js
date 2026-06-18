@@ -1,7 +1,7 @@
 /**
  * badge.js — collab badge 命令
  *
- * 管理工牌：签发、查看、续期
+ * 管理工牌：签发、查看、权限检查、续期
  */
 
 import fs from 'node:fs';
@@ -111,6 +111,49 @@ export function formatBadge(data) {
     `   有效期: ${data.expires_at}`,
   ];
   return lines.join('\n');
+}
+
+/**
+ * 检查 agent 是否有指定操作权限
+ *
+ * @param {string} sharedDir
+ * @param {string} agentId
+ * @param {string} operation - 操作名（write_shard, review_tasks, write_memory 等）
+ * @returns {{ allowed: boolean, role?: string, error?: string }}
+ */
+export function check(sharedDir, agentId, operation) {
+  if (!agentId) return { allowed: false, error: '缺少 agentId' };
+  if (!operation) return { allowed: false, error: '缺少 operation 参数' };
+
+  const badgePath = path.join(sharedDir, `BADGE-${agentId}.md`);
+  if (!fs.existsSync(badgePath)) {
+    return { allowed: false, error: `工牌 BADGE-${agentId}.md 不存在。请先运行 collab badge issue` };
+  }
+
+  const { data } = yaml.read(badgePath);
+  const role = data.role;
+
+  if (!role) {
+    return { allowed: false, error: '工牌缺少 role 字段' };
+  }
+
+  const allowed = hasPermission(role, operation);
+  return { allowed, role, operation };
+}
+
+/**
+ * 格式化权限检查结果
+ * @param {{ allowed: boolean, role?: string, operation?: string, error?: string }} result
+ * @returns {string}
+ */
+export function formatCheckResult(result) {
+  if (result.error) {
+    return `❌ ${result.error}`;
+  }
+  if (result.allowed) {
+    return `✅ 允许: ${getRoleName(result.role)} 可以执行 ${result.operation}`;
+  }
+  return `🚫 拒绝: ${getRoleName(result.role)} 无权执行 ${result.operation}`;
 }
 
 // ── 内部工具 ──
